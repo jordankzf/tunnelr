@@ -4,7 +4,7 @@ A cyberpunk-themed Windows desktop app for managing SSH local port forwarding tu
 
 ![.NET 7](https://img.shields.io/badge/.NET-7.0--windows-512BD4)
 ![WPF](https://img.shields.io/badge/UI-WPF-0078D4)
-![License](https://img.shields.io/badge/license-MIT-green)
+![License](https://img.shields.io/badge/license-GPL--3.0-blue)
 
 ## What It Does
 
@@ -19,7 +19,7 @@ Each tunnel runs `ssh -L <port>:localhost:<port> user@server -p <ssh-port> -N` a
 
 ## Screenshots
 
-![Tunnelr Screenshot](screenshot.png)
+<img src="screenshot.png" alt="Tunnelr Screenshot" width="400">
 
 ## Prerequisites
 
