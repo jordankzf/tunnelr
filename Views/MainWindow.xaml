@@ -1,0 +1,90 @@
+<Window x:Class="Tunnelr.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Tunnelr - SSH Tunnel Switchboard"
+        Width="420" Height="460"
+        MinWidth="380" MinHeight="360"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanMinimize"
+        Background="{StaticResource BgDarkBrush}"
+        Icon="/Resources/app.ico">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>  <!-- Menu -->
+            <RowDefinition Height="Auto"/>  <!-- Toolbar -->
+            <RowDefinition Height="*"/>     <!-- Cards -->
+            <RowDefinition Height="Auto"/>  <!-- Status bar -->
+        </Grid.RowDefinitions>
+
+        <!-- ═══ Background pattern ═══ -->
+        <Border Grid.RowSpan="4" Background="{StaticResource CircuitPatternBrush}"/>
+
+        <!-- ═══ Menu Bar ═══ -->
+        <Menu Grid.Row="0" Style="{StaticResource CyberMenu}">
+            <MenuItem Header="_File" Style="{StaticResource CyberMenuItem}">
+                <MenuItem Header="_Server Settings..." Click="ServerSettings_Click" Style="{StaticResource CyberMenuItem}"/>
+                <Separator/>
+                <MenuItem Header="E_xit" Click="Exit_Click" Style="{StaticResource CyberMenuItem}"/>
+            </MenuItem>
+            <MenuItem Header="_Help" Style="{StaticResource CyberMenuItem}">
+                <MenuItem Header="_How to Use" Click="HowToUse_Click" Style="{StaticResource CyberMenuItem}"/>
+                <Separator/>
+                <MenuItem Header="_About Tunnelr" Click="About_Click" Style="{StaticResource CyberMenuItem}"/>
+            </MenuItem>
+        </Menu>
+
+        <!-- ═══ Toolbar ═══ -->
+        <Border Grid.Row="1" Padding="10,8" Background="#0c101e">
+            <Border.BorderBrush>
+                <SolidColorBrush Color="#1a2040"/>
+            </Border.BorderBrush>
+            <Border.BorderThickness>0,0,0,1</Border.BorderThickness>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <Button Content="Add" Style="{StaticResource NeonButton}"
+                        Click="Add_Click" Margin="0,0,8,0"/>
+                <Button Content="Edit" Style="{StaticResource NeonButton}"
+                        Click="Edit_Click" Margin="0,0,8,0"/>
+                <Button Content="Delete" Style="{StaticResource NeonButton}"
+                        Click="Delete_Click" Margin="0,0,8,0"/>
+                <Button x:Name="btnToggleAll" Content="All On" Style="{StaticResource NeonButton}"
+                        Click="ToggleAll_Click"/>
+            </StackPanel>
+        </Border>
+
+        <!-- ═══ Tunnel Cards Grid ═══ -->
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      Background="Transparent">
+            <WrapPanel x:Name="cardPanel"
+                       HorizontalAlignment="Center"
+                       Margin="10,10,10,10"
+                       ItemWidth="185" ItemHeight="145"/>
+        </ScrollViewer>
+
+        <!-- ═══ Status Bar ═══ -->
+        <Border Grid.Row="3" Background="{StaticResource BgStatusBarBrush}"
+                Padding="12,6" BorderThickness="0,1,0,0">
+            <Border.BorderBrush>
+                <SolidColorBrush Color="#1a2040"/>
+            </Border.BorderBrush>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="txtStatus"
+                           Text="0 of 0 tunnels active"
+                           Foreground="{StaticResource NeonCyanBrush}"
+                           FontFamily="Consolas" FontSize="11"
+                           VerticalAlignment="Center"/>
+                <TextBlock x:Name="txtServer"
+                           Grid.Column="1"
+                           Text="jordan@103.167.151.128:2222"
+                           Foreground="{StaticResource TextDimBrush}"
+                           FontFamily="Consolas" FontSize="11"
+                           VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

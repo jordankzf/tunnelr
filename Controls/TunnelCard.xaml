@@ -1,0 +1,96 @@
+<UserControl x:Class="Tunnelr.Controls.TunnelCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Width="170" Height="130"
+             Cursor="Hand"
+             MouseLeftButtonDown="Card_Click">
+
+    <Grid x:Name="cardRoot" Margin="6">
+        <!-- Outer glow border -->
+        <Border x:Name="glowBorder" CornerRadius="4" Margin="-2">
+            <Border.Effect>
+                <DropShadowEffect x:Name="cardGlow"
+                                  Color="#00e5ff" ShadowDepth="0"
+                                  BlurRadius="12" Opacity="0.25"/>
+            </Border.Effect>
+            <Border.Background>
+                <SolidColorBrush Color="Transparent"/>
+            </Border.Background>
+        </Border>
+
+        <!-- Card body -->
+        <Border x:Name="cardBody" CornerRadius="4"
+                BorderThickness="1.5"
+                BorderBrush="#00667a"
+                ClipToBounds="True">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                    <GradientStop Color="#0d1528" Offset="0"/>
+                    <GradientStop Color="#111d35" Offset="0.5"/>
+                    <GradientStop Color="#0d1528" Offset="1"/>
+                </LinearGradientBrush>
+            </Border.Background>
+
+            <Grid>
+                <!-- Inner circuit decoration -->
+                <Canvas Opacity="0.15" IsHitTestVisible="False">
+                    <Line X1="10" Y1="20" X2="50" Y2="20" Stroke="#00e5ff" StrokeThickness="0.5"/>
+                    <Line X1="50" Y1="20" X2="55" Y2="25" Stroke="#00e5ff" StrokeThickness="0.5"/>
+                    <Line X1="55" Y1="25" X2="80" Y2="25" Stroke="#00e5ff" StrokeThickness="0.5"/>
+                    <Line X1="120" Y1="90" X2="155" Y2="90" Stroke="#00e5ff" StrokeThickness="0.5"/>
+                    <Line X1="100" Y1="100" X2="120" Y2="100" Stroke="#00e5ff" StrokeThickness="0.5"/>
+                    <Line X1="120" Y1="90" X2="120" Y2="100" Stroke="#00e5ff" StrokeThickness="0.5"/>
+                    <Ellipse Canvas.Left="49" Canvas.Top="19" Width="3" Height="3" Fill="#00e5ff"/>
+                    <Ellipse Canvas.Left="119" Canvas.Top="89" Width="3" Height="3" Fill="#00e5ff"/>
+                </Canvas>
+
+                <!-- Content -->
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <!-- Nickname -->
+                    <TextBlock x:Name="txtNickname"
+                               Text="Tunnel"
+                               FontFamily="Consolas"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Foreground="#00e5ff"
+                               HorizontalAlignment="Center"
+                               Margin="0,0,0,4"/>
+
+                    <!-- Port number -->
+                    <TextBlock x:Name="txtPort"
+                               Text="0000"
+                               FontFamily="Consolas"
+                               FontSize="30"
+                               FontWeight="Bold"
+                               Foreground="#ff00aa"
+                               HorizontalAlignment="Center"
+                               Margin="0,0,0,8"/>
+
+                    <!-- Status orb -->
+                    <Grid HorizontalAlignment="Center" Width="16" Height="16">
+                        <Ellipse x:Name="orbGlow" Width="16" Height="16">
+                            <Ellipse.Fill>
+                                <RadialGradientBrush>
+                                    <GradientStop Color="#4000e5ff" Offset="0"/>
+                                    <GradientStop Color="#0000e5ff" Offset="1"/>
+                                </RadialGradientBrush>
+                            </Ellipse.Fill>
+                        </Ellipse>
+                        <Ellipse x:Name="orbDot" Width="8" Height="8"
+                                 HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Ellipse.Fill>
+                                <SolidColorBrush x:Name="orbFill" Color="#553344"/>
+                            </Ellipse.Fill>
+                        </Ellipse>
+                    </Grid>
+                </StackPanel>
+
+                <!-- Corner accents (top-left, bottom-right) -->
+                <Path Data="M 0,12 L 0,0 L 12,0" Stroke="#00667a" StrokeThickness="1.5"
+                      HorizontalAlignment="Left" VerticalAlignment="Top" Margin="6,6,0,0"/>
+                <Path Data="M 0,12 L 12,12 L 12,0" Stroke="#00667a" StrokeThickness="1.5"
+                      HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,6,6"/>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

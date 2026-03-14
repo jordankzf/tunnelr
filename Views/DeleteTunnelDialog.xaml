@@ -1,0 +1,39 @@
+<Window x:Class="Tunnelr.Views.DeleteTunnelDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Delete Tunnel"
+        Width="320" Height="250"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="#0a0e1a">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock x:Name="txtHeader" Grid.Row="0"
+                   Text="// SELECT TUNNEL TO DELETE"
+                   FontFamily="Consolas" FontSize="14" FontWeight="Bold"
+                   Foreground="#ff00aa"/>
+
+        <ListBox x:Name="lstTunnels" Grid.Row="2"
+                 Background="#080c18"
+                 Foreground="#00e5ff"
+                 BorderBrush="#00667a"
+                 BorderThickness="1"
+                 FontFamily="Consolas"
+                 FontSize="13"/>
+
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="btnAction" Content="Delete" Style="{StaticResource NeonButton}"
+                    Click="Delete_Click" Width="80" Margin="0,0,8,0"/>
+            <Button Content="Cancel" Style="{StaticResource NeonButton}"
+                    Click="Cancel_Click" Width="80"/>
+        </StackPanel>
+    </Grid>
+</Window>

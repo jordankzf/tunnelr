@@ -1,0 +1,186 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- Color Palette -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <Color x:Key="BgDark">#0a0e1a</Color>
+    <Color x:Key="BgCard">#0d1528</Color>
+    <Color x:Key="BgStatusBar">#060a14</Color>
+    <Color x:Key="CircuitTrace">#1a2040</Color>
+    <Color x:Key="NeonCyan">#00e5ff</Color>
+    <Color x:Key="NeonCyanDim">#00667a</Color>
+    <Color x:Key="NeonMagenta">#ff00aa</Color>
+    <Color x:Key="NeonMagentaDim">#7a0055</Color>
+    <Color x:Key="TextLight">#c0d0e0</Color>
+    <Color x:Key="TextDim">#506070</Color>
+    <Color x:Key="GlowActive">#00e5ff</Color>
+    <Color x:Key="GlowInactive">#331a2040</Color>
+
+    <SolidColorBrush x:Key="BgDarkBrush" Color="{StaticResource BgDark}"/>
+    <SolidColorBrush x:Key="BgCardBrush" Color="{StaticResource BgCard}"/>
+    <SolidColorBrush x:Key="BgStatusBarBrush" Color="{StaticResource BgStatusBar}"/>
+    <SolidColorBrush x:Key="CircuitTraceBrush" Color="{StaticResource CircuitTrace}"/>
+    <SolidColorBrush x:Key="NeonCyanBrush" Color="{StaticResource NeonCyan}"/>
+    <SolidColorBrush x:Key="NeonCyanDimBrush" Color="{StaticResource NeonCyanDim}"/>
+    <SolidColorBrush x:Key="NeonMagentaBrush" Color="{StaticResource NeonMagenta}"/>
+    <SolidColorBrush x:Key="NeonMagentaDimBrush" Color="{StaticResource NeonMagentaDim}"/>
+    <SolidColorBrush x:Key="TextLightBrush" Color="{StaticResource TextLight}"/>
+    <SolidColorBrush x:Key="TextDimBrush" Color="{StaticResource TextDim}"/>
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- Circuit Board Background Pattern (tiled) -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <DrawingBrush x:Key="CircuitPatternBrush" TileMode="Tile" Viewport="0,0,80,80" ViewportUnits="Absolute">
+        <DrawingBrush.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="{StaticResource BgDarkBrush}">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry Rect="0,0,80,80"/>
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <!-- Horizontal traces -->
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="{StaticResource CircuitTraceBrush}" Thickness="1"/>
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <GeometryGroup>
+                            <LineGeometry StartPoint="0,20" EndPoint="30,20"/>
+                            <LineGeometry StartPoint="30,20" EndPoint="35,25"/>
+                            <LineGeometry StartPoint="35,25" EndPoint="60,25"/>
+                            <LineGeometry StartPoint="50,60" EndPoint="80,60"/>
+                            <LineGeometry StartPoint="0,50" EndPoint="20,50"/>
+                            <LineGeometry StartPoint="20,50" EndPoint="25,45"/>
+                            <LineGeometry StartPoint="60,10" EndPoint="80,10"/>
+                        </GeometryGroup>
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <!-- Vertical traces -->
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen>
+                        <Pen Brush="{StaticResource CircuitTraceBrush}" Thickness="1"/>
+                    </GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry>
+                        <GeometryGroup>
+                            <LineGeometry StartPoint="40,0" EndPoint="40,15"/>
+                            <LineGeometry StartPoint="70,30" EndPoint="70,55"/>
+                            <LineGeometry StartPoint="15,60" EndPoint="15,80"/>
+                        </GeometryGroup>
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <!-- Circuit nodes (small dots) -->
+                <GeometryDrawing Brush="{StaticResource CircuitTraceBrush}">
+                    <GeometryDrawing.Geometry>
+                        <GeometryGroup>
+                            <EllipseGeometry Center="30,20" RadiusX="2" RadiusY="2"/>
+                            <EllipseGeometry Center="60,25" RadiusX="2" RadiusY="2"/>
+                            <EllipseGeometry Center="70,30" RadiusX="2" RadiusY="2"/>
+                            <EllipseGeometry Center="15,60" RadiusX="2" RadiusY="2"/>
+                            <EllipseGeometry Center="40,15" RadiusX="2" RadiusY="2"/>
+                            <EllipseGeometry Center="50,60" RadiusX="2" RadiusY="2"/>
+                        </GeometryGroup>
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingBrush.Drawing>
+    </DrawingBrush>
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- Neon Button Style -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <Style x:Key="NeonButton" TargetType="Button">
+        <Setter Property="Foreground" Value="{StaticResource NeonCyanBrush}"/>
+        <Setter Property="FontFamily" Value="Consolas"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Padding" Value="16,6"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="border"
+                            Background="{StaticResource BgCardBrush}"
+                            BorderBrush="{StaticResource NeonCyanDimBrush}"
+                            BorderThickness="1.5"
+                            CornerRadius="2"
+                            Padding="{TemplateBinding Padding}">
+                        <Border.Effect>
+                            <DropShadowEffect Color="{StaticResource NeonCyan}"
+                                              ShadowDepth="0" BlurRadius="8" Opacity="0.3"/>
+                        </Border.Effect>
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource NeonCyanBrush}"/>
+                            <Setter TargetName="border" Property="Background">
+                                <Setter.Value>
+                                    <SolidColorBrush Color="#1500e5ff"/>
+                                </Setter.Value>
+                            </Setter>
+                            <Setter TargetName="border" Property="Effect">
+                                <Setter.Value>
+                                    <DropShadowEffect Color="{StaticResource NeonCyan}"
+                                                      ShadowDepth="0" BlurRadius="15" Opacity="0.7"/>
+                                </Setter.Value>
+                            </Setter>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="border" Property="Background">
+                                <Setter.Value>
+                                    <SolidColorBrush Color="#2500e5ff"/>
+                                </Setter.Value>
+                            </Setter>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- Menu Styling -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <Style x:Key="CyberMenu" TargetType="Menu">
+        <Setter Property="Background" Value="{StaticResource BgDarkBrush}"/>
+        <Setter Property="Foreground" Value="{StaticResource TextLightBrush}"/>
+        <Setter Property="FontFamily" Value="Consolas"/>
+        <Setter Property="FontSize" Value="12"/>
+    </Style>
+
+    <Style x:Key="CyberMenuItem" TargetType="MenuItem">
+        <Setter Property="Foreground" Value="{StaticResource TextLightBrush}"/>
+        <Setter Property="FontFamily" Value="Consolas"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Style.Triggers>
+            <Trigger Property="IsHighlighted" Value="True">
+                <Setter Property="Foreground" Value="{StaticResource NeonCyanBrush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- TextBox Style (for dialogs) -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <Style x:Key="CyberTextBox" TargetType="TextBox">
+        <Setter Property="Background">
+            <Setter.Value>
+                <SolidColorBrush Color="#080c18"/>
+            </Setter.Value>
+        </Setter>
+        <Setter Property="Foreground" Value="{StaticResource NeonCyanBrush}"/>
+        <Setter Property="CaretBrush" Value="{StaticResource NeonCyanBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource NeonCyanDimBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="FontFamily" Value="Consolas"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="Padding" Value="6,4"/>
+        <Style.Triggers>
+            <Trigger Property="IsFocused" Value="True">
+                <Setter Property="BorderBrush" Value="{StaticResource NeonCyanBrush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+</ResourceDictionary>

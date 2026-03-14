@@ -1,0 +1,71 @@
+<Window x:Class="Tunnelr.Views.ServerSettingsDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Server Settings"
+        Width="380" Height="280"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="#0a0e1a">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="16"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="90"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Title -->
+        <TextBlock Grid.Row="0" Grid.ColumnSpan="2"
+                   Text="// SERVER CONNECTION"
+                   FontFamily="Consolas" FontSize="14" FontWeight="Bold"
+                   Foreground="#00e5ff"/>
+
+        <!-- Server IP -->
+        <TextBlock Grid.Row="2" Grid.Column="0"
+                   Text="Server:"
+                   FontFamily="Consolas" FontSize="12"
+                   Foreground="#c0d0e0"
+                   VerticalAlignment="Center"/>
+        <TextBox x:Name="txtServer" Grid.Row="2" Grid.Column="1"
+                 Style="{StaticResource CyberTextBox}"/>
+
+        <!-- SSH Port -->
+        <TextBlock Grid.Row="4" Grid.Column="0"
+                   Text="SSH Port:"
+                   FontFamily="Consolas" FontSize="12"
+                   Foreground="#c0d0e0"
+                   VerticalAlignment="Center"/>
+        <TextBox x:Name="txtPort" Grid.Row="4" Grid.Column="1"
+                 Style="{StaticResource CyberTextBox}"
+                 MaxLength="5"/>
+
+        <!-- Username -->
+        <TextBlock Grid.Row="6" Grid.Column="0"
+                   Text="Username:"
+                   FontFamily="Consolas" FontSize="12"
+                   Foreground="#c0d0e0"
+                   VerticalAlignment="Center"/>
+        <TextBox x:Name="txtUser" Grid.Row="6" Grid.Column="1"
+                 Style="{StaticResource CyberTextBox}"/>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="8" Grid.ColumnSpan="2"
+                    Orientation="Horizontal" HorizontalAlignment="Right"
+                    Margin="0,8,0,0">
+            <Button Content="Save" Style="{StaticResource NeonButton}"
+                    Click="Save_Click" Width="80" Margin="0,0,8,0"/>
+            <Button x:Name="btnCancel" Content="Cancel" Style="{StaticResource NeonButton}"
+                    Click="Cancel_Click" Width="80"/>
+        </StackPanel>
+    </Grid>
+</Window>

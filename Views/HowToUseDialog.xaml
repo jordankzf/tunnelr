@@ -1,0 +1,160 @@
+<Window x:Class="Tunnelr.Views.HowToUseDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="How to Use Tunnelr"
+        Width="500" Height="520"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="#0a0e1a">
+
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <!-- Title -->
+                <TextBlock Text="// HOW TO USE TUNNELR"
+                           FontFamily="Consolas" FontSize="16" FontWeight="Bold"
+                           Foreground="#00e5ff" Margin="0,0,0,16"/>
+
+                <!-- Prerequisites -->
+                <TextBlock Text="PREREQUISITES"
+                           FontFamily="Consolas" FontSize="13" FontWeight="Bold"
+                           Foreground="#ff00aa" Margin="0,0,0,8"/>
+
+                <TextBlock FontFamily="Consolas" FontSize="11" Foreground="#c0d0e0"
+                           TextWrapping="Wrap" Margin="0,0,0,4">
+                    <Run Text="1. "/>
+                    <Run Text="OpenSSH must be installed" Foreground="#00e5ff"/>
+                    <LineBreak/>
+                    <Run Text="   Windows 10/11 includes ssh.exe by default."/>
+                    <LineBreak/>
+                    <Run Text="   Verify by running: ssh -V in a terminal."/>
+                </TextBlock>
+
+                <TextBlock FontFamily="Consolas" FontSize="11" Foreground="#c0d0e0"
+                           TextWrapping="Wrap" Margin="0,0,0,4">
+                    <Run Text="2. "/>
+                    <Run Text="SSH key authentication must be set up" Foreground="#00e5ff"/>
+                    <LineBreak/>
+                    <Run Text="   Your private key should be at ~/.ssh/id_rsa"/>
+                    <LineBreak/>
+                    <Run Text="   or loaded in ssh-agent. Tunnelr does not"/>
+                    <LineBreak/>
+                    <Run Text="   support password authentication."/>
+                </TextBlock>
+
+                <TextBlock FontFamily="Consolas" FontSize="11" Foreground="#c0d0e0"
+                           TextWrapping="Wrap" Margin="0,0,0,4">
+                    <Run Text="3. "/>
+                    <Run Text="Your public key must be on the server" Foreground="#00e5ff"/>
+                    <LineBreak/>
+                    <Run Text="   Added to ~/.ssh/authorized_keys on the"/>
+                    <LineBreak/>
+                    <Run Text="   remote machine."/>
+                </TextBlock>
+
+                <TextBlock FontFamily="Consolas" FontSize="11" Foreground="#c0d0e0"
+                           TextWrapping="Wrap" Margin="0,0,0,16">
+                    <Run Text="4. "/>
+                    <Run Text="The remote server must be reachable" Foreground="#00e5ff"/>
+                    <LineBreak/>
+                    <Run Text="   Make sure your network allows outbound SSH"/>
+                    <LineBreak/>
+                    <Run Text="   connections on the configured port."/>
+                </TextBlock>
+
+                <!-- What is SSH Tunneling -->
+                <TextBlock Text="WHAT IS SSH TUNNELING?"
+                           FontFamily="Consolas" FontSize="13" FontWeight="Bold"
+                           Foreground="#ff00aa" Margin="0,0,0,8"/>
+
+                <TextBlock FontFamily="Consolas" FontSize="11" Foreground="#c0d0e0"
+                           TextWrapping="Wrap" Margin="0,0,0,16">
+                    SSH tunneling (local port forwarding) lets you
+                    securely access services on a remote server as
+                    if they were running on your local machine.
+                    <LineBreak/><LineBreak/>
+                    When you activate a tunnel for port 5432,
+                    Tunnelr runs:
+                    <LineBreak/>
+                    <Run Text="  ssh -L 5432:localhost:5432 user@server" Foreground="#00e5ff"/>
+                    <LineBreak/><LineBreak/>
+                    This means localhost:5432 on your PC now connects
+                    to port 5432 on the remote server through an
+                    encrypted SSH connection.
+                </TextBlock>
+
+                <!-- Using the App -->
+                <TextBlock Text="USING THE APP"
+                           FontFamily="Consolas" FontSize="13" FontWeight="Bold"
+                           Foreground="#ff00aa" Margin="0,0,0,8"/>
+
+                <TextBlock FontFamily="Consolas" FontSize="11" Foreground="#c0d0e0"
+                           TextWrapping="Wrap" Margin="0,0,0,4">
+                    <Run Text="Click a card" Foreground="#00e5ff"/>
+                    <Run Text=" to toggle a tunnel on or off."/>
+                    <LineBreak/>
+                    <Run Text="Active tunnels glow cyan with a pulsing border."/>
+                </TextBlock>
+
+                <TextBlock FontFamily="Consolas" FontSize="11" Foreground="#c0d0e0"
+                           TextWrapping="Wrap" Margin="0,0,0,4">
+                    <Run Text="Add" Foreground="#00e5ff"/>
+                    <Run Text=" - Create a new tunnel with a port and nickname."/>
+                </TextBlock>
+
+                <TextBlock FontFamily="Consolas" FontSize="11" Foreground="#c0d0e0"
+                           TextWrapping="Wrap" Margin="0,0,0,4">
+                    <Run Text="Edit" Foreground="#00e5ff"/>
+                    <Run Text=" - Select a tunnel to change its port or nickname."/>
+                </TextBlock>
+
+                <TextBlock FontFamily="Consolas" FontSize="11" Foreground="#c0d0e0"
+                           TextWrapping="Wrap" Margin="0,0,0,4">
+                    <Run Text="Delete" Foreground="#00e5ff"/>
+                    <Run Text=" - Remove a tunnel from the switchboard."/>
+                </TextBlock>
+
+                <TextBlock FontFamily="Consolas" FontSize="11" Foreground="#c0d0e0"
+                           TextWrapping="Wrap" Margin="0,0,0,4">
+                    <Run Text="All On / All Off" Foreground="#00e5ff"/>
+                    <Run Text=" - Toggle all tunnels at once."/>
+                </TextBlock>
+
+                <TextBlock FontFamily="Consolas" FontSize="11" Foreground="#c0d0e0"
+                           TextWrapping="Wrap" Margin="0,0,0,16">
+                    <Run Text="Closing the window" Foreground="#00e5ff"/>
+                    <Run Text=" minimizes to the system tray."/>
+                    <LineBreak/>
+                    <Run Text="Right-click the tray icon to toggle tunnels"/>
+                    <LineBreak/>
+                    <Run Text="or use File > Exit to fully quit."/>
+                </TextBlock>
+
+                <!-- Server Settings -->
+                <TextBlock Text="SERVER SETTINGS"
+                           FontFamily="Consolas" FontSize="13" FontWeight="Bold"
+                           Foreground="#ff00aa" Margin="0,0,0,8"/>
+
+                <TextBlock FontFamily="Consolas" FontSize="11" Foreground="#c0d0e0"
+                           TextWrapping="Wrap" Margin="0,0,0,4">
+                    Go to
+                    <Run Text="File > Server Settings" Foreground="#00e5ff"/>
+                    to change the remote server address, SSH port,
+                    or username. Settings are saved to tunnels.json
+                    next to the executable.
+                </TextBlock>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Close button -->
+        <Button Grid.Row="1" Content="Got it" Style="{StaticResource NeonButton}"
+                Click="Close_Click" Width="100" HorizontalAlignment="Center"
+                Margin="0,12,0,0"/>
+    </Grid>
+</Window>
