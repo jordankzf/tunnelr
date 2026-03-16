@@ -73,11 +73,19 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock x:Name="txtStatus"
-                           Text="0 of 0 tunnels active"
-                           Foreground="{StaticResource NeonCyanBrush}"
-                           FontFamily="Consolas" FontSize="11"
-                           VerticalAlignment="Center"/>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock x:Name="txtStatus"
+                               Text="0 of 0 tunnels active"
+                               Foreground="{StaticResource NeonCyanBrush}"
+                               FontFamily="Consolas" FontSize="11"
+                               VerticalAlignment="Center"/>
+                    <Button x:Name="btnRefresh" Content="↻"
+                            Style="{StaticResource NeonButton}"
+                            Click="Refresh_Click"
+                            FontSize="11" Padding="4,1" Margin="8,0,0,0"
+                            VerticalAlignment="Center"
+                            ToolTip="Refresh tunnel status"/>
+                </StackPanel>
                 <TextBlock x:Name="txtServer"
                            Grid.Column="1"
                            Text="jordan@103.167.151.128:2222"

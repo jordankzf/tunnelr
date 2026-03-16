@@ -14,7 +14,7 @@ public partial class MainWindow : Window
     private AppConfig _config;
     private WinForms.NotifyIcon _trayIcon = null!;
     private WinForms.ContextMenuStrip _trayMenu = null!;
-    private DispatcherTimer _healthTimer = null!;
+    private DispatcherTimer? _healthTimer;
     private bool _reallyClosing;
 
     public MainWindow()
@@ -31,9 +31,9 @@ public partial class MainWindow : Window
                 _config.Server = dlg.ServerAddress;
                 _config.Port = dlg.SshPort;
                 _config.User = dlg.Username;
+                _config.HealthCheckInterval = dlg.HealthCheckInterval;
                 TunnelConfig.Save(_config);
             }
-            // Even if they close the dialog, we proceed with defaults
         }
 
         SetupTray();
@@ -95,8 +95,9 @@ public partial class MainWindow : Window
         {
             if (!TunnelProcess.Start(tunnel, _config))
             {
+                var errorMsg = tunnel.ErrorMessage ?? "Unknown error";
                 MessageBox.Show(
-                    $"Failed to start SSH tunnel on port {tunnel.Port}.\n\n" +
+                    $"Failed to start SSH tunnel on port {tunnel.Port}.\n\n{errorMsg}\n\n" +
                     "Make sure ssh.exe is available and your key is loaded.",
                     "Tunnel Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
@@ -119,7 +120,12 @@ public partial class MainWindow : Window
                 return;
             }
 
-            _config.Tunnels.Add(new TunnelInfo { Port = dlg.TunnelPort, Nickname = dlg.Nickname });
+            _config.Tunnels.Add(new TunnelInfo
+            {
+                Port = dlg.TunnelPort,
+                RemotePort = dlg.RemotePort,
+                Nickname = dlg.Nickname
+            });
             TunnelConfig.Save(_config);
             RebuildCards();
             UpdateStatus();
@@ -143,7 +149,7 @@ public partial class MainWindow : Window
         var tunnel = _config.Tunnels[pickDlg.SelectedIndex];
         var wasActive = tunnel.IsActive;
 
-        var editDlg = new EditTunnelDialog(tunnel.Port, tunnel.Nickname) { Owner = this };
+        var editDlg = new EditTunnelDialog(tunnel.Port, tunnel.RemotePort, tunnel.Nickname) { Owner = this };
         if (editDlg.ShowDialog() == true)
         {
             // Check for duplicate port (if port changed)
@@ -156,16 +162,18 @@ public partial class MainWindow : Window
             }
 
             // If active and port changed, restart the tunnel
-            if (wasActive && editDlg.TunnelPort != tunnel.Port)
+            if (wasActive && (editDlg.TunnelPort != tunnel.Port || editDlg.RemotePort != tunnel.RemotePort))
             {
                 TunnelProcess.Stop(tunnel);
                 tunnel.Port = editDlg.TunnelPort;
+                tunnel.RemotePort = editDlg.RemotePort;
                 tunnel.Nickname = editDlg.Nickname;
                 TunnelProcess.Start(tunnel, _config);
             }
             else
             {
                 tunnel.Port = editDlg.TunnelPort;
+                tunnel.RemotePort = editDlg.RemotePort;
                 tunnel.Nickname = editDlg.Nickname;
             }
 
@@ -215,6 +223,11 @@ public partial class MainWindow : Window
             $"{_config.Tunnels.Count} tunnels");
     }
 
+    private void Refresh_Click(object sender, RoutedEventArgs e)
+    {
+        RunHealthCheck();
+    }
+
     // ─── Menu handlers ───
 
     private void ServerSettings_Click(object sender, RoutedEventArgs e)
@@ -232,7 +245,11 @@ public partial class MainWindow : Window
             _config.Server = dlg.ServerAddress;
             _config.Port = dlg.SshPort;
             _config.User = dlg.Username;
+            _config.HealthCheckInterval = dlg.HealthCheckInterval;
             TunnelConfig.Save(_config);
+
+            // Reconfigure health timer with new interval
+            SetupHealthTimer();
 
             RefreshAllCards();
             UpdateStatus();
@@ -344,27 +361,46 @@ public partial class MainWindow : Window
 
     private void SetupHealthTimer()
     {
-        _healthTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
-        _healthTimer.Tick += (s, e) =>
+        // Stop existing timer if any
+        _healthTimer?.Stop();
+        _healthTimer = null;
+
+        if (_config.HealthCheckInterval <= 0) return;
+
+        _healthTimer = new DispatcherTimer
         {
-            bool changed = false;
-            foreach (var tunnel in _config.Tunnels)
-            {
-                if (tunnel.IsActive && tunnel.SshProcess != null && tunnel.SshProcess.HasExited)
-                {
-                    tunnel.IsActive = false;
-                    tunnel.SshProcess.Dispose();
-                    tunnel.SshProcess = null;
-                    changed = true;
-                }
-            }
-            if (changed)
-            {
-                RefreshAllCards();
-                UpdateStatus();
-            }
+            Interval = TimeSpan.FromSeconds(_config.HealthCheckInterval)
         };
+        _healthTimer.Tick += (s, e) => RunHealthCheck();
         _healthTimer.Start();
+    }
+
+    private void RunHealthCheck()
+    {
+        bool changed = false;
+        foreach (var tunnel in _config.Tunnels)
+        {
+            if (tunnel.IsActive && tunnel.SshProcess != null && tunnel.SshProcess.HasExited)
+            {
+                var exitCode = tunnel.SshProcess.ExitCode;
+                var stderr = TunnelProcess.GetError(tunnel);
+
+                tunnel.IsActive = false;
+                tunnel.HasError = true;
+                tunnel.ErrorMessage = stderr ?? $"SSH process exited with code {exitCode}";
+                tunnel.SshProcess.Dispose();
+                tunnel.SshProcess = null;
+
+                ShowBalloon("Tunnel Failed",
+                    $"Port {tunnel.Port} ({tunnel.Nickname}) disconnected unexpectedly.");
+                changed = true;
+            }
+        }
+        if (changed)
+        {
+            RefreshAllCards();
+            UpdateStatus();
+        }
     }
 
     // ─── Window lifecycle ───
@@ -379,7 +415,7 @@ public partial class MainWindow : Window
         }
         else
         {
-            _healthTimer.Stop();
+            _healthTimer?.Stop();
             TunnelProcess.StopAll(_config.Tunnels);
             _trayIcon.Visible = false;
             _trayIcon.Dispose();

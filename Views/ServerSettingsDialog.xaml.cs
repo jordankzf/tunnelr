@@ -1,13 +1,18 @@
 using System.Windows;
+using Microsoft.Win32;
 using Tunnelr.Models;
 
 namespace Tunnelr.Views;
 
 public partial class ServerSettingsDialog : Window
 {
+    private const string RegistryRunKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
+    private const string AppName = "Tunnelr";
+
     public string ServerAddress => txtServer.Text.Trim();
     public int SshPort { get; private set; }
     public string Username => txtUser.Text.Trim();
+    public int HealthCheckInterval { get; private set; }
 
     public ServerSettingsDialog(AppConfig config, bool isFirstRun = false)
     {
@@ -16,6 +21,8 @@ public partial class ServerSettingsDialog : Window
         txtServer.Text = config.Server;
         txtPort.Text = config.Port.ToString();
         txtUser.Text = config.User;
+        txtHealthInterval.Text = config.HealthCheckInterval.ToString();
+        chkStartup.IsChecked = IsStartupEnabled();
 
         if (isFirstRun)
         {
@@ -50,12 +57,55 @@ public partial class ServerSettingsDialog : Window
             return;
         }
 
+        if (!int.TryParse(txtHealthInterval.Text, out var health) || health < 0)
+        {
+            MessageBox.Show("Enter a valid health check interval (0 to disable).", "Invalid Interval",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
         SshPort = port;
+        HealthCheckInterval = health;
+
+        // Set or remove startup registry entry
+        SetStartupEnabled(chkStartup.IsChecked == true);
+
         DialogResult = true;
     }
 
     private void Cancel_Click(object sender, RoutedEventArgs e)
     {
         DialogResult = false;
+    }
+
+    private static bool IsStartupEnabled()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(RegistryRunKey, false);
+            return key?.GetValue(AppName) != null;
+        }
+        catch { return false; }
+    }
+
+    private static void SetStartupEnabled(bool enabled)
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(RegistryRunKey, true);
+            if (key == null) return;
+
+            if (enabled)
+            {
+                var exePath = Environment.ProcessPath;
+                if (exePath != null)
+                    key.SetValue(AppName, $"\"{exePath}\"");
+            }
+            else
+            {
+                key.DeleteValue(AppName, false);
+            }
+        }
+        catch { }
     }
 }

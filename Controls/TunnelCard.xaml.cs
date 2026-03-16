@@ -17,6 +17,26 @@ public partial class TunnelCard : UserControl
 
     private readonly Storyboard? _pulseStoryboard;
 
+    // Frozen brushes for performance
+    private static readonly SolidColorBrush CyanBrush = Freeze(new SolidColorBrush(Color.FromRgb(0, 229, 255)));
+    private static readonly SolidColorBrush DimCyanBrush = Freeze(new SolidColorBrush(Color.FromRgb(0, 102, 122)));
+    private static readonly SolidColorBrush MagentaBrush = Freeze(new SolidColorBrush(Color.FromRgb(255, 0, 170)));
+    private static readonly SolidColorBrush ErrorRedBrush = Freeze(new SolidColorBrush(Color.FromRgb(255, 50, 50)));
+    private static readonly SolidColorBrush DimRedBrush = Freeze(new SolidColorBrush(Color.FromRgb(140, 30, 30)));
+
+    private static readonly RadialGradientBrush CyanOrbGlow = Freeze(new RadialGradientBrush(
+        Color.FromArgb(100, 0, 229, 255), Color.FromArgb(0, 0, 229, 255)));
+    private static readonly RadialGradientBrush DimMagentaOrbGlow = Freeze(new RadialGradientBrush(
+        Color.FromArgb(30, 255, 0, 170), Color.FromArgb(0, 255, 0, 170)));
+    private static readonly RadialGradientBrush ErrorOrbGlow = Freeze(new RadialGradientBrush(
+        Color.FromArgb(100, 255, 50, 50), Color.FromArgb(0, 255, 50, 50)));
+
+    private static T Freeze<T>(T brush) where T : Freezable
+    {
+        brush.Freeze();
+        return brush;
+    }
+
     public TunnelCard()
     {
         InitializeComponent();
@@ -54,27 +74,36 @@ public partial class TunnelCard : UserControl
     {
         if (Tunnel == null) return;
 
-        if (Tunnel.IsActive)
+        if (Tunnel.HasError)
+        {
+            // Error: red glow
+            cardBody.BorderBrush = ErrorRedBrush;
+            cardGlow.Color = Color.FromRgb(255, 50, 50);
+            cardGlow.Opacity = 0.4;
+            orbFill.Color = Color.FromRgb(255, 50, 50);
+            orbGlow.Fill = ErrorOrbGlow;
+            txtPort.Foreground = ErrorRedBrush;
+            try { _pulseStoryboard?.Stop(this); } catch { }
+        }
+        else if (Tunnel.IsActive)
         {
             // Active: cyan glow, bright orb
-            cardBody.BorderBrush = new SolidColorBrush(Color.FromRgb(0, 229, 255));
+            cardBody.BorderBrush = CyanBrush;
             cardGlow.Color = Color.FromRgb(0, 229, 255);
             orbFill.Color = Color.FromRgb(0, 229, 255);
-            orbGlow.Fill = new RadialGradientBrush(
-                Color.FromArgb(100, 0, 229, 255), Color.FromArgb(0, 0, 229, 255));
-            txtPort.Foreground = new SolidColorBrush(Color.FromRgb(0, 229, 255));
+            orbGlow.Fill = CyanOrbGlow;
+            txtPort.Foreground = CyanBrush;
             try { _pulseStoryboard?.Begin(this, true); } catch { }
         }
         else
         {
             // Inactive: dim, magenta port
-            cardBody.BorderBrush = new SolidColorBrush(Color.FromRgb(0, 102, 122));
+            cardBody.BorderBrush = DimCyanBrush;
             cardGlow.Color = Color.FromRgb(0, 102, 122);
             cardGlow.Opacity = 0.15;
             orbFill.Color = Color.FromRgb(85, 51, 68);
-            orbGlow.Fill = new RadialGradientBrush(
-                Color.FromArgb(30, 255, 0, 170), Color.FromArgb(0, 255, 0, 170));
-            txtPort.Foreground = new SolidColorBrush(Color.FromRgb(255, 0, 170));
+            orbGlow.Fill = DimMagentaOrbGlow;
+            txtPort.Foreground = MagentaBrush;
             try { _pulseStoryboard?.Stop(this); } catch { }
         }
     }
@@ -85,9 +114,9 @@ public partial class TunnelCard : UserControl
 
         if (hover)
         {
-            cardBody.BorderBrush = new SolidColorBrush(Color.FromRgb(0, 229, 255));
+            cardBody.BorderBrush = CyanBrush;
             cardGlow.BlurRadius = 20;
-            if (!Tunnel.IsActive) cardGlow.Opacity = 0.4;
+            if (!Tunnel.IsActive && !Tunnel.HasError) cardGlow.Opacity = 0.4;
         }
         else
         {

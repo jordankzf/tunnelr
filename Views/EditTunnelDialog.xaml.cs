@@ -5,12 +5,14 @@ namespace Tunnelr.Views;
 public partial class EditTunnelDialog : Window
 {
     public int TunnelPort { get; private set; }
+    public int RemotePort { get; private set; }
     public string Nickname { get; private set; } = string.Empty;
 
-    public EditTunnelDialog(int currentPort, string currentNickname)
+    public EditTunnelDialog(int currentPort, int currentRemotePort, string currentNickname)
     {
         InitializeComponent();
         txtPort.Text = currentPort.ToString();
+        txtRemotePort.Text = currentRemotePort > 0 ? currentRemotePort.ToString() : "";
         txtNickname.Text = currentNickname;
         txtNickname.Focus();
         txtNickname.SelectAll();
@@ -20,9 +22,20 @@ public partial class EditTunnelDialog : Window
     {
         if (!int.TryParse(txtPort.Text, out var port) || port < 1 || port > 65535)
         {
-            MessageBox.Show("Enter a valid port number (1-65535).", "Invalid Port",
+            MessageBox.Show("Enter a valid local port number (1-65535).", "Invalid Port",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
+        }
+
+        int remotePort = 0;
+        if (!string.IsNullOrWhiteSpace(txtRemotePort.Text))
+        {
+            if (!int.TryParse(txtRemotePort.Text, out remotePort) || remotePort < 1 || remotePort > 65535)
+            {
+                MessageBox.Show("Enter a valid remote port number (1-65535), or leave blank to match local port.", "Invalid Port",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
         }
 
         if (string.IsNullOrWhiteSpace(txtNickname.Text))
@@ -33,6 +46,7 @@ public partial class EditTunnelDialog : Window
         }
 
         TunnelPort = port;
+        RemotePort = remotePort;
         Nickname = txtNickname.Text.Trim();
         DialogResult = true;
     }

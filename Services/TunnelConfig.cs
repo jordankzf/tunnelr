@@ -7,7 +7,8 @@ namespace Tunnelr.Services;
 public static class TunnelConfig
 {
     private static readonly string ConfigPath = Path.Combine(
-        AppDomain.CurrentDomain.BaseDirectory, "tunnels.json");
+        Path.GetDirectoryName(Environment.ProcessPath ?? AppDomain.CurrentDomain.BaseDirectory)!,
+        "tunnels.json");
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -44,11 +45,9 @@ public static class TunnelConfig
             Tunnels = new List<TunnelInfo>
             {
                 new() { Port = 5432, Nickname = "PostgreSQL" },
-                new() { Port = 3306, Nickname = "MySQL" },
                 new() { Port = 6379, Nickname = "Redis" },
                 new() { Port = 8080, Nickname = "Web App" },
-                new() { Port = 27017, Nickname = "MongoDB" },
-                new() { Port = 9090, Nickname = "Prometheus" }
+                new() { Port = 3000, RemotePort = 3001, Nickname = "Dev Server" }
             }
         };
     }
