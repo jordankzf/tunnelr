@@ -105,10 +105,6 @@
                             BorderThickness="1.5"
                             CornerRadius="2"
                             Padding="{TemplateBinding Padding}">
-                        <Border.Effect>
-                            <DropShadowEffect Color="{StaticResource NeonCyan}"
-                                              ShadowDepth="0" BlurRadius="8" Opacity="0.3"/>
-                        </Border.Effect>
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <ControlTemplate.Triggers>
@@ -117,12 +113,6 @@
                             <Setter TargetName="border" Property="Background">
                                 <Setter.Value>
                                     <SolidColorBrush Color="#1500e5ff"/>
-                                </Setter.Value>
-                            </Setter>
-                            <Setter TargetName="border" Property="Effect">
-                                <Setter.Value>
-                                    <DropShadowEffect Color="{StaticResource NeonCyan}"
-                                                      ShadowDepth="0" BlurRadius="15" Opacity="0.7"/>
                                 </Setter.Value>
                             </Setter>
                         </Trigger>

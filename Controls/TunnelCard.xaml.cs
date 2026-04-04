@@ -4,7 +4,6 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
-using System.Windows.Media.Effects;
 using Tunnelr.Models;
 
 namespace Tunnelr.Controls;
@@ -15,14 +14,12 @@ public partial class TunnelCard : UserControl
 
     public event Action<TunnelCard>? ToggleRequested;
 
-    private readonly Storyboard? _pulseStoryboard;
+    private Storyboard? _pulseStoryboard;
 
-    // Frozen brushes for performance
     private static readonly SolidColorBrush CyanBrush = Freeze(new SolidColorBrush(Color.FromRgb(0, 229, 255)));
     private static readonly SolidColorBrush DimCyanBrush = Freeze(new SolidColorBrush(Color.FromRgb(0, 102, 122)));
     private static readonly SolidColorBrush MagentaBrush = Freeze(new SolidColorBrush(Color.FromRgb(255, 0, 170)));
     private static readonly SolidColorBrush ErrorRedBrush = Freeze(new SolidColorBrush(Color.FromRgb(255, 50, 50)));
-    private static readonly SolidColorBrush DimRedBrush = Freeze(new SolidColorBrush(Color.FromRgb(140, 30, 30)));
 
     private static readonly RadialGradientBrush CyanOrbGlow = Freeze(new RadialGradientBrush(
         Color.FromArgb(100, 0, 229, 255), Color.FromArgb(0, 0, 229, 255)));
@@ -41,23 +38,6 @@ public partial class TunnelCard : UserControl
     {
         InitializeComponent();
 
-        // Build pulse animation for active state
-        var pulseAnim = new DoubleAnimation
-        {
-            From = 0.25,
-            To = 0.6,
-            Duration = TimeSpan.FromMilliseconds(1200),
-            AutoReverse = true,
-            RepeatBehavior = RepeatBehavior.Forever,
-            EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
-        };
-
-        _pulseStoryboard = new Storyboard();
-        Storyboard.SetTarget(pulseAnim, glowBorder);
-        Storyboard.SetTargetProperty(pulseAnim, new PropertyPath("Effect.Opacity"));
-        _pulseStoryboard.Children.Add(pulseAnim);
-
-        // Hover effects
         MouseEnter += (s, e) => SetHover(true);
         MouseLeave += (s, e) => SetHover(false);
     }
@@ -70,41 +50,73 @@ public partial class TunnelCard : UserControl
         UpdateVisualState();
     }
 
+    public void Cleanup()
+    {
+        StopPulse();
+        _pulseStoryboard = null;
+    }
+
     public void UpdateVisualState()
     {
         if (Tunnel == null) return;
 
+        StopPulse();
+
         if (Tunnel.HasError)
         {
-            // Error: red glow
             cardBody.BorderBrush = ErrorRedBrush;
-            cardGlow.Color = Color.FromRgb(255, 50, 50);
-            cardGlow.Opacity = 0.4;
+            glowColor.Color = Color.FromRgb(255, 50, 50);
+            glowBorder.Opacity = 0.4;
             orbFill.Color = Color.FromRgb(255, 50, 50);
             orbGlow.Fill = ErrorOrbGlow;
             txtPort.Foreground = ErrorRedBrush;
-            try { _pulseStoryboard?.Stop(this); } catch { }
         }
         else if (Tunnel.IsActive)
         {
-            // Active: cyan glow, bright orb
             cardBody.BorderBrush = CyanBrush;
-            cardGlow.Color = Color.FromRgb(0, 229, 255);
+            glowColor.Color = Color.FromRgb(0, 229, 255);
+            glowBorder.Opacity = 0.25;
             orbFill.Color = Color.FromRgb(0, 229, 255);
             orbGlow.Fill = CyanOrbGlow;
             txtPort.Foreground = CyanBrush;
-            try { _pulseStoryboard?.Begin(this, true); } catch { }
+            StartPulse();
         }
         else
         {
-            // Inactive: dim, magenta port
             cardBody.BorderBrush = DimCyanBrush;
-            cardGlow.Color = Color.FromRgb(0, 102, 122);
-            cardGlow.Opacity = 0.15;
+            glowColor.Color = Color.FromRgb(0, 102, 122);
+            glowBorder.Opacity = 0.15;
             orbFill.Color = Color.FromRgb(85, 51, 68);
             orbGlow.Fill = DimMagentaOrbGlow;
             txtPort.Foreground = MagentaBrush;
-            try { _pulseStoryboard?.Stop(this); } catch { }
+        }
+    }
+
+    private void StartPulse()
+    {
+        var anim = new DoubleAnimation
+        {
+            From = 0.25,
+            To = 0.6,
+            Duration = TimeSpan.FromMilliseconds(1200),
+            AutoReverse = true,
+            RepeatBehavior = RepeatBehavior.Forever,
+            EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
+        };
+
+        _pulseStoryboard = new Storyboard();
+        Storyboard.SetTarget(anim, glowBorder);
+        Storyboard.SetTargetProperty(anim, new PropertyPath(OpacityProperty));
+        _pulseStoryboard.Children.Add(anim);
+        _pulseStoryboard.Begin(this, true);
+    }
+
+    private void StopPulse()
+    {
+        if (_pulseStoryboard != null)
+        {
+            try { _pulseStoryboard.Stop(this); } catch { }
+            _pulseStoryboard = null;
         }
     }
 
@@ -115,13 +127,11 @@ public partial class TunnelCard : UserControl
         if (hover)
         {
             cardBody.BorderBrush = CyanBrush;
-            cardGlow.BlurRadius = 20;
-            if (!Tunnel.IsActive && !Tunnel.HasError) cardGlow.Opacity = 0.4;
+            if (!Tunnel.IsActive && !Tunnel.HasError) glowBorder.Opacity = 0.4;
         }
         else
         {
             UpdateVisualState();
-            cardGlow.BlurRadius = 12;
         }
     }
 

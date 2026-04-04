@@ -6,13 +6,12 @@
              MouseLeftButtonDown="Card_Click">
 
     <Grid x:Name="cardRoot" Margin="6">
-        <!-- Outer glow border -->
-        <Border x:Name="glowBorder" CornerRadius="4" Margin="-2">
-            <Border.Effect>
-                <DropShadowEffect x:Name="cardGlow"
-                                  Color="#00e5ff" ShadowDepth="0"
-                                  BlurRadius="12" Opacity="0.25"/>
-            </Border.Effect>
+        <!-- Glow border (replaces DropShadowEffect) -->
+        <Border x:Name="glowBorder" CornerRadius="6" Margin="-3"
+                BorderThickness="3" Opacity="0.25">
+            <Border.BorderBrush>
+                <SolidColorBrush x:Name="glowColor" Color="#00e5ff"/>
+            </Border.BorderBrush>
             <Border.Background>
                 <SolidColorBrush Color="Transparent"/>
             </Border.Background>
@@ -32,18 +31,6 @@
             </Border.Background>
 
             <Grid>
-                <!-- Inner circuit decoration -->
-                <Canvas Opacity="0.15" IsHitTestVisible="False">
-                    <Line X1="10" Y1="20" X2="50" Y2="20" Stroke="#00e5ff" StrokeThickness="0.5"/>
-                    <Line X1="50" Y1="20" X2="55" Y2="25" Stroke="#00e5ff" StrokeThickness="0.5"/>
-                    <Line X1="55" Y1="25" X2="80" Y2="25" Stroke="#00e5ff" StrokeThickness="0.5"/>
-                    <Line X1="120" Y1="90" X2="155" Y2="90" Stroke="#00e5ff" StrokeThickness="0.5"/>
-                    <Line X1="100" Y1="100" X2="120" Y2="100" Stroke="#00e5ff" StrokeThickness="0.5"/>
-                    <Line X1="120" Y1="90" X2="120" Y2="100" Stroke="#00e5ff" StrokeThickness="0.5"/>
-                    <Ellipse Canvas.Left="49" Canvas.Top="19" Width="3" Height="3" Fill="#00e5ff"/>
-                    <Ellipse Canvas.Left="119" Canvas.Top="89" Width="3" Height="3" Fill="#00e5ff"/>
-                </Canvas>
-
                 <!-- Content -->
                 <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                     <!-- Nickname -->

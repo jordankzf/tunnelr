@@ -46,6 +46,9 @@ public partial class MainWindow : Window
 
     private void RebuildCards()
     {
+        // Stop animations on existing cards before clearing
+        foreach (TunnelCard card in cardPanel.Children)
+            card.Cleanup();
         cardPanel.Children.Clear();
         foreach (var tunnel in _config.Tunnels)
         {

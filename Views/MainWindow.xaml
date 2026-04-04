@@ -18,7 +18,11 @@
         </Grid.RowDefinitions>
 
         <!-- ═══ Background pattern ═══ -->
-        <Border Grid.RowSpan="4" Background="{StaticResource CircuitPatternBrush}"/>
+        <Border Grid.RowSpan="4" Background="{StaticResource CircuitPatternBrush}">
+            <Border.CacheMode>
+                <BitmapCache/>
+            </Border.CacheMode>
+        </Border>
 
         <!-- ═══ Menu Bar ═══ -->
         <Menu Grid.Row="0" Style="{StaticResource CyberMenu}">
