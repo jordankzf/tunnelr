@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Windows;
 using System.Windows.Threading;
+using Microsoft.Win32;
 using Tunnelr.Controls;
 using Tunnelr.Models;
 using Tunnelr.Services;
@@ -40,6 +41,23 @@ public partial class MainWindow : Window
         SetupHealthTimer();
         RebuildCards();
         UpdateStatus();
+
+        SystemEvents.PowerModeChanged += OnPowerModeChanged;
+    }
+
+    private void OnPowerModeChanged(object sender, PowerModeChangedEventArgs e)
+    {
+        if (e.Mode == PowerModes.Suspend)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                var activeTunnels = _config.Tunnels.Where(t => t.IsActive).ToList();
+                if (activeTunnels.Count == 0) return;
+                foreach (var t in activeTunnels) TunnelProcess.Stop(t);
+                RefreshAllCards();
+                UpdateStatus();
+            });
+        }
     }
 
     // ─── Card management ───
@@ -380,29 +398,44 @@ public partial class MainWindow : Window
 
     private void RunHealthCheck()
     {
-        bool changed = false;
+        int failed = 0;
+        string? firstFailedName = null;
+
         foreach (var tunnel in _config.Tunnels)
         {
-            if (tunnel.IsActive && tunnel.SshProcess != null && tunnel.SshProcess.HasExited)
-            {
-                var exitCode = tunnel.SshProcess.ExitCode;
-                var stderr = TunnelProcess.GetError(tunnel);
+            if (!tunnel.IsActive || tunnel.SshProcess == null) continue;
 
-                tunnel.IsActive = false;
-                tunnel.HasError = true;
-                tunnel.ErrorMessage = stderr ?? $"SSH process exited with code {exitCode}";
-                tunnel.SshProcess.Dispose();
-                tunnel.SshProcess = null;
+            bool hasExited;
+            try { hasExited = tunnel.SshProcess.HasExited; }
+            catch { hasExited = true; }
 
-                ShowBalloon("Tunnel Failed",
-                    $"Port {tunnel.Port} ({tunnel.Nickname}) disconnected unexpectedly.");
-                changed = true;
-            }
+            if (!hasExited) continue;
+
+            int exitCode = -1;
+            try { exitCode = tunnel.SshProcess.ExitCode; } catch { }
+
+            var stderr = TunnelProcess.GetError(tunnel);
+
+            tunnel.IsActive = false;
+            tunnel.HasError = true;
+            tunnel.ErrorMessage = stderr ?? $"SSH process exited with code {exitCode}";
+
+            try { tunnel.SshProcess.Dispose(); } catch { }
+            tunnel.SshProcess = null;
+
+            if (failed == 0) firstFailedName = $"{tunnel.Port} ({tunnel.Nickname})";
+            failed++;
         }
-        if (changed)
+
+        if (failed > 0)
         {
             RefreshAllCards();
             UpdateStatus();
+
+            var message = failed == 1
+                ? $"{firstFailedName} disconnected unexpectedly."
+                : $"{failed} tunnels disconnected unexpectedly.";
+            ShowBalloon("Tunnel Failed", message);
         }
     }
 
@@ -418,6 +451,7 @@ public partial class MainWindow : Window
         }
         else
         {
+            SystemEvents.PowerModeChanged -= OnPowerModeChanged;
             _healthTimer?.Stop();
             TunnelProcess.StopAll(_config.Tunnels);
             _trayIcon.Visible = false;
