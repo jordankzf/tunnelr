@@ -8,11 +8,10 @@ using Tunnelr.Models;
 
 namespace Tunnelr.Controls;
 
-public partial class TunnelCard : UserControl
+public partial class TunnelCard : Button
 {
-    public TunnelInfo? Tunnel { get; private set; }
-
-    public event Action<TunnelCard>? ToggleRequested;
+    private TunnelInfo? Tunnel => DataContext as TunnelInfo;
+    private TunnelInfo? _observed;
 
     private Storyboard? _pulseStoryboard;
 
@@ -40,20 +39,21 @@ public partial class TunnelCard : UserControl
 
         MouseEnter += (s, e) => SetHover(true);
         MouseLeave += (s, e) => SetHover(false);
+        Loaded += (_, _) => Observe(Tunnel);
+        Unloaded += (_, _) => Observe(null);
+        DataContextChanged += (_, _) => { if (IsLoaded) Observe(Tunnel); };
     }
 
-    public void Bind(TunnelInfo tunnel)
+    private void Observe(TunnelInfo? tunnel)
     {
-        Tunnel = tunnel;
-        txtNickname.Text = tunnel.Nickname;
-        txtPort.Text = tunnel.Port.ToString();
-        UpdateVisualState();
-    }
-
-    public void Cleanup()
-    {
-        StopPulse();
-        _pulseStoryboard = null;
+        if (_observed != null) _observed.Session.Changed -= UpdateVisualState;
+        _observed = tunnel;
+        if (tunnel != null)
+        {
+            tunnel.Session.Changed += UpdateVisualState;
+            UpdateVisualState();
+        }
+        else StopPulse();
     }
 
     public void UpdateVisualState()
@@ -62,7 +62,9 @@ public partial class TunnelCard : UserControl
 
         StopPulse();
 
-        if (Tunnel.HasError)
+        var state = Tunnel.Session.State;
+        stateLabel.Visibility = state is "Off" or "Listening" ? Visibility.Collapsed : Visibility.Visible;
+        if (state is "Failed" or "Blocked" or "Verify host")
         {
             cardBody.BorderBrush = ErrorRedBrush;
             glowColor.Color = Color.FromRgb(255, 50, 50);
@@ -71,7 +73,7 @@ public partial class TunnelCard : UserControl
             orbGlow.Fill = ErrorOrbGlow;
             txtPort.Foreground = ErrorRedBrush;
         }
-        else if (Tunnel.IsActive)
+        else if (Tunnel.Session.State == "Listening")
         {
             cardBody.BorderBrush = CyanBrush;
             glowColor.Color = Color.FromRgb(0, 229, 255);
@@ -127,7 +129,7 @@ public partial class TunnelCard : UserControl
         if (hover)
         {
             cardBody.BorderBrush = CyanBrush;
-            if (!Tunnel.IsActive && !Tunnel.HasError) glowBorder.Opacity = 0.4;
+            if (Tunnel.Session.State == "Off") glowBorder.Opacity = 0.4;
         }
         else
         {
@@ -135,8 +137,4 @@ public partial class TunnelCard : UserControl
         }
     }
 
-    private void Card_Click(object sender, MouseButtonEventArgs e)
-    {
-        ToggleRequested?.Invoke(this);
-    }
 }

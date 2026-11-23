@@ -1,9 +1,15 @@
-<UserControl x:Class="Tunnelr.Controls.TunnelCard"
+<Button x:Class="Tunnelr.Controls.TunnelCard"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Width="170" Height="130"
              Cursor="Hand"
-             MouseLeftButtonDown="Card_Click">
+             AutomationProperties.Name="{Binding Nickname}" AutomationProperties.ItemStatus="{Binding Session.State}">
+    <Button.Template><ControlTemplate TargetType="Button"><ContentPresenter/></ControlTemplate></Button.Template>
+    <Button.ToolTip><StackPanel>
+        <TextBlock FontWeight="Bold" Text="{Binding Nickname}"/>
+        <TextBlock><Run Text="127.0.0.1:"/><Run Text="{Binding Port, Mode=OneWay}"/><Run Text=" → localhost:"/><Run Text="{Binding EffectiveRemotePort, Mode=OneWay}"/></TextBlock>
+        <TextBlock Text="{Binding Session.State}"/><TextBlock Text="{Binding Session.Detail}" MaxWidth="320" TextWrapping="Wrap"/>
+    </StackPanel></Button.ToolTip>
 
     <Grid x:Name="cardRoot" Margin="6">
         <!-- Glow border (replaces DropShadowEffect) -->
@@ -31,11 +37,13 @@
             </Border.Background>
 
             <Grid>
+                <Path Data="M 12,20 H 52 L 58,26 H 70 M 100,101 H 120 V 91 H 153" Stroke="#164254" StrokeThickness="0.65" IsHitTestVisible="False"/>
+                <TextBlock x:Name="stateLabel" Text="{Binding Session.State}" FontFamily="Consolas" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,2" Foreground="#ffc872"/>
                 <!-- Content -->
                 <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                     <!-- Nickname -->
                     <TextBlock x:Name="txtNickname"
-                               Text="Tunnel"
+                               Text="{Binding Nickname}" MaxWidth="140" TextTrimming="CharacterEllipsis"
                                FontFamily="Consolas"
                                FontSize="13"
                                FontWeight="SemiBold"
@@ -45,7 +53,7 @@
 
                     <!-- Port number -->
                     <TextBlock x:Name="txtPort"
-                               Text="0000"
+                               Text="{Binding Port}"
                                FontFamily="Consolas"
                                FontSize="30"
                                FontWeight="Bold"
@@ -80,4 +88,4 @@
             </Grid>
         </Border>
     </Grid>
-</UserControl>
+</Button>

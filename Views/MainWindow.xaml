@@ -1,11 +1,12 @@
 <Window x:Class="Tunnelr.Views.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Tunnelr - SSH Tunnel Switchboard"
+        xmlns:controls="clr-namespace:Tunnelr.Controls"
+        Title="Tunnelr 2 - SSH Tunnel Switchboard"
         Width="420" Height="460"
-        MinWidth="380" MinHeight="360"
+        MinWidth="414" MinHeight="360"
         WindowStartupLocation="CenterScreen"
-        ResizeMode="CanMinimize"
+        ResizeMode="CanResize"
         Background="{StaticResource BgDarkBrush}"
         Icon="/Resources/app.ico">
 
@@ -26,16 +27,26 @@
 
         <!-- ═══ Menu Bar ═══ -->
         <Menu Grid.Row="0" Style="{StaticResource CyberMenu}">
+            <Menu.Resources>
+                <Style TargetType="MenuItem" BasedOn="{StaticResource CyberMenuCommand}"/>
+                <Style TargetType="Separator">
+                    <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Separator">
+                        <Border Height="1" Background="#304457" Margin="7,3"/>
+                    </ControlTemplate></Setter.Value></Setter>
+                </Style>
+            </Menu.Resources>
             <MenuItem Header="_File" Style="{StaticResource CyberMenuItem}">
-                <MenuItem Header="_Server Settings..." Click="ServerSettings_Click" Style="{StaticResource CyberMenuItem}"/>
+                <MenuItem Header="Edit server profile…" Click="Settings_Click"/>
+                <MenuItem Header="New server profile…" Click="NewProfile_Click"/>
                 <Separator/>
-                <MenuItem Header="E_xit" Click="Exit_Click" Style="{StaticResource CyberMenuItem}"/>
+                <MenuItem Header="Import configuration…" Click="Import_Click"/>
+                <MenuItem Header="Restore previous save…" Click="Restore_Click"/>
+                <MenuItem Header="Open settings folder" Click="Folder_Click"/>
+                <Separator/><MenuItem Header="Exit Tunnelr" Click="Exit_Click"/>
             </MenuItem>
-            <MenuItem Header="_Help" Style="{StaticResource CyberMenuItem}">
-                <MenuItem Header="_How to Use" Click="HowToUse_Click" Style="{StaticResource CyberMenuItem}"/>
-                <Separator/>
-                <MenuItem Header="_About Tunnelr" Click="About_Click" Style="{StaticResource CyberMenuItem}"/>
-            </MenuItem>
+            <MenuItem x:Name="profiles" Header="_Profiles" Style="{StaticResource CyberMenuItem}"/>
+            <MenuItem x:Name="groups" Header="_Groups" Style="{StaticResource CyberMenuItem}"/>
+            <MenuItem Header="_Help" Style="{StaticResource CyberMenuItem}"><MenuItem Header="Using Tunnelr" Click="Help_Click"/></MenuItem>
         </Menu>
 
         <!-- ═══ Toolbar ═══ -->
@@ -48,11 +59,11 @@
                 <Button Content="Add" Style="{StaticResource NeonButton}"
                         Click="Add_Click" Margin="0,0,8,0"/>
                 <Button Content="Edit" Style="{StaticResource NeonButton}"
-                        Click="Edit_Click" Margin="0,0,8,0"/>
+                        Click="PickEdit_Click" Margin="0,0,8,0"/>
                 <Button Content="Delete" Style="{StaticResource NeonButton}"
-                        Click="Delete_Click" Margin="0,0,8,0"/>
-                <Button x:Name="btnToggleAll" Content="All On" Style="{StaticResource NeonButton}"
-                        Click="ToggleAll_Click"/>
+                        Click="PickDelete_Click" Margin="0,0,8,0"/>
+                <Button x:Name="bulk" Content="All On" Style="{StaticResource NeonButton}"
+                        Click="Bulk_Click"/>
             </StackPanel>
         </Border>
 
@@ -60,10 +71,19 @@
         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled"
                       Background="Transparent">
-            <WrapPanel x:Name="cardPanel"
-                       HorizontalAlignment="Center"
-                       Margin="10,10,10,10"
-                       ItemWidth="185" ItemHeight="145"/>
+            <Grid Margin="3,10">
+                <ItemsControl x:Name="cards" HorizontalAlignment="Center">
+                    <ItemsControl.ItemsPanel><ItemsPanelTemplate>
+                        <WrapPanel ItemWidth="185" ItemHeight="145"/>
+                    </ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate><DataTemplate>
+                        <controls:TunnelCard Click="Toggle_Click" ContextMenuOpening="CardMenuOpening">
+                            <controls:TunnelCard.ContextMenu><ContextMenu/></controls:TunnelCard.ContextMenu>
+                        </controls:TunnelCard>
+                    </DataTemplate></ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock x:Name="empty" Text="Add a tunnel to get started." Foreground="{StaticResource TextLightBrush}" HorizontalAlignment="Center"/>
+            </Grid>
         </ScrollViewer>
 
         <!-- ═══ Status Bar ═══ -->
@@ -83,17 +103,11 @@
                                Foreground="{StaticResource NeonCyanBrush}"
                                FontFamily="Consolas" FontSize="11"
                                VerticalAlignment="Center"/>
-                    <Button x:Name="btnRefresh" Content="↻"
-                            Style="{StaticResource NeonButton}"
-                            Click="Refresh_Click"
-                            FontSize="11" Padding="4,1" Margin="8,0,0,0"
-                            VerticalAlignment="Center"
-                            ToolTip="Refresh tunnel status"/>
                 </StackPanel>
                 <TextBlock x:Name="txtServer"
                            Grid.Column="1"
-                           Text="jordan@103.167.151.128:2222"
-                           Foreground="{StaticResource TextDimBrush}"
+                           TextTrimming="CharacterEllipsis" MaxWidth="225" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
+                           Foreground="#8394a8"
                            FontFamily="Consolas" FontSize="11"
                            VerticalAlignment="Center"/>
             </Grid>

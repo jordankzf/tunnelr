@@ -1,468 +1,288 @@
-using System;
-using System.Linq;
+using System.Diagnostics;
 using System.Windows;
-using System.Windows.Threading;
+using System.Windows.Controls;
 using Microsoft.Win32;
-using Tunnelr.Controls;
 using Tunnelr.Models;
 using Tunnelr.Services;
-using WinForms = System.Windows.Forms;
+using Forms = System.Windows.Forms;
 
 namespace Tunnelr.Views;
 
 public partial class MainWindow : Window
 {
     private AppConfig _config;
-    private WinForms.NotifyIcon _trayIcon = null!;
-    private WinForms.ContextMenuStrip _trayMenu = null!;
-    private DispatcherTimer? _healthTimer;
-    private bool _reallyClosing;
+    private readonly Forms.NotifyIcon _tray;
+    private readonly Forms.ContextMenuStrip _trayMenu = new();
+    private readonly HashSet<TunnelProcess> _observed = new();
+    private bool _exiting;
+    private string? _group;
+    private ServerProfile Profile => _config.Current;
+    private IEnumerable<TunnelInfo> AllTunnels => _config.AllProfiles.SelectMany(p => p.Tunnels);
+    private IEnumerable<TunnelInfo> VisibleTunnels => Profile.Tunnels.Where(t =>
+        _group == null || t.Group == _group);
 
-    public MainWindow()
+    public MainWindow(AppConfig config, bool firstRun)
     {
-        _config = TunnelConfig.Load();
+        _config = config;
         InitializeComponent();
+        using var stream = Application.GetResourceStream(new Uri("pack://application:,,,/Resources/app.ico")).Stream;
+        _tray = new Forms.NotifyIcon { Icon = new System.Drawing.Icon(stream), Text = "Tunnelr 2",
+            Visible = true, ContextMenuStrip = _trayMenu };
+        _tray.DoubleClick += (_, _) => Reveal();
+        _trayMenu.Opening += (_, _) => BuildTrayMenu();
+        SystemEvents.PowerModeChanged += PowerChanged;
+        Bind();
+        if (firstRun) Loaded += (_, _) => EditProfile(Profile, false);
+    }
 
-        // First-run: force server configuration if no config file existed
-        if (!TunnelConfig.ConfigExists())
-        {
-            var dlg = new ServerSettingsDialog(_config, isFirstRun: true);
-            if (dlg.ShowDialog() == true)
-            {
-                _config.Server = dlg.ServerAddress;
-                _config.Port = dlg.SshPort;
-                _config.User = dlg.Username;
-                _config.HealthCheckInterval = dlg.HealthCheckInterval;
-                TunnelConfig.Save(_config);
-            }
-        }
+    private void Bind()
+    {
+        profiles.Items.Clear();
+        foreach (var profile in _config.AllProfiles)
+            AddChoice(profiles, profile.Name, profile == Profile, () => SelectProfile(profile));
+        var names = Profile.Tunnels.Select(t => t.Group).Where(g => !string.IsNullOrWhiteSpace(g)).Distinct().OrderBy(g => g).ToList();
+        if (_group != null && !names.Contains(_group)) _group = null;
+        groups.Items.Clear();
+        AddChoice(groups, "All tunnels", _group == null, () => SelectGroup(null));
+        foreach (var group in names) AddChoice(groups, group, group == _group, () => SelectGroup(group));
+        groups.Visibility = names.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+        profiles.Visibility = _config.Profiles.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+        foreach (var session in _observed) session.Changed -= UpdateStatus;
+        _observed.Clear();
+        foreach (var tunnel in AllTunnels)
+            if (_observed.Add(tunnel.Session)) tunnel.Session.Changed += UpdateStatus;
+        RenderCards();
+    }
 
-        SetupTray();
-        SetupHealthTimer();
-        RebuildCards();
+    private void RenderCards()
+    {
+        var visible = VisibleTunnels.ToList();
+        cards.ItemsSource = visible;
+        empty.Visibility = visible.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         UpdateStatus();
-
-        SystemEvents.PowerModeChanged += OnPowerModeChanged;
-    }
-
-    private void OnPowerModeChanged(object sender, PowerModeChangedEventArgs e)
-    {
-        if (e.Mode == PowerModes.Suspend)
-        {
-            Dispatcher.Invoke(() =>
-            {
-                var activeTunnels = _config.Tunnels.Where(t => t.IsActive).ToList();
-                if (activeTunnels.Count == 0) return;
-                foreach (var t in activeTunnels) TunnelProcess.Stop(t);
-                RefreshAllCards();
-                UpdateStatus();
-            });
-        }
-    }
-
-    // ─── Card management ───
-
-    private void RebuildCards()
-    {
-        // Stop animations on existing cards before clearing
-        foreach (TunnelCard card in cardPanel.Children)
-            card.Cleanup();
-        cardPanel.Children.Clear();
-        foreach (var tunnel in _config.Tunnels)
-        {
-            var card = new TunnelCard();
-            card.Bind(tunnel);
-            card.ToggleRequested += OnCardToggle;
-            cardPanel.Children.Add(card);
-        }
-    }
-
-    private void RefreshAllCards()
-    {
-        foreach (TunnelCard card in cardPanel.Children)
-            card.UpdateVisualState();
     }
 
     private void UpdateStatus()
     {
-        var active = _config.Tunnels.Count(t => t.IsActive);
-        var total = _config.Tunnels.Count;
-
-        txtStatus.Text = $"{active} of {total} tunnels active";
-        txtServer.Text = $"{_config.User}@{_config.Server}:{_config.Port}";
-        btnToggleAll.Content = (active == total && total > 0) ? "All Off" : "All On";
-
-        UpdateTrayTooltip();
+        txtServer.Text = $"{Profile.User}@{Profile.Server}:{Profile.Port}";
+        txtStatus.Text = $"{Profile.Tunnels.Count(t => t.Session.State == "Listening")} of {Profile.Tunnels.Count} listening";
+        txtStatus.ToolTip = _group == null ? Profile.Name : $"{Profile.Name} · {_group}";
+        _tray.Text = $"Tunnelr · {AllTunnels.Count(t => t.Session.State == "Listening")} listening";
+        bulk.IsEnabled = VisibleTunnels.Any();
+        bulk.Content = VisibleTunnels.Any() && VisibleTunnels.All(t => t.Session.Wanted) ? "All Off" : "All On";
     }
 
-    // ─── Tunnel toggling ───
-
-    private void OnCardToggle(TunnelCard card)
+    private bool Persist(Action change, Action undo)
     {
-        if (card.Tunnel == null) return;
-        ToggleTunnel(card.Tunnel);
-        card.UpdateVisualState();
-        UpdateStatus();
-    }
-
-    private void ToggleTunnel(TunnelInfo tunnel)
-    {
-        if (tunnel.IsActive)
+        change();
+        try { TunnelConfig.Save(_config); return true; }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException)
         {
-            TunnelProcess.Stop(tunnel);
-            ShowBalloon("Tunnel Disconnected", $"Port {tunnel.Port} ({tunnel.Nickname})");
+            undo();
+            MessageBox.Show(this, ex.Message, "Settings could not be saved");
+            return false;
         }
-        else
+    }
+
+    private static void AddChoice(MenuItem menu, string label, bool selected, Action choose)
+    {
+        var item = new MenuItem { Header = label, IsChecked = selected };
+        item.Click += (_, _) => choose();
+        menu.Items.Add(item);
+    }
+
+    private void SelectProfile(ServerProfile chosen)
+    {
+        if (chosen == Profile) return;
+        var old = _config.SelectedProfile;
+        if (Persist(() => _config.SelectedProfile = chosen.Name, () => _config.SelectedProfile = old)) _group = null;
+        Bind();
+    }
+
+    private void SelectGroup(string? group) { _group = group; Bind(); }
+
+    private void PickEdit_Click(object sender, RoutedEventArgs e) => PickTunnel((Button)sender, EditTunnel);
+    private void PickDelete_Click(object sender, RoutedEventArgs e) => PickTunnel((Button)sender, DeleteTunnel);
+
+    private void PickTunnel(Button anchor, Action<TunnelInfo> select)
+    {
+        var menu = new ContextMenu { PlacementTarget = anchor, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
+        foreach (var tunnel in VisibleTunnels)
         {
-            if (!TunnelProcess.Start(tunnel, _config))
+            var item = new MenuItem { Header = $"{tunnel.Port} · {tunnel.Nickname}" };
+            item.Click += (_, _) => select(tunnel);
+            menu.Items.Add(item);
+        }
+        if (menu.Items.Count > 0) menu.IsOpen = true;
+    }
+
+    private void Help_Click(object sender, RoutedEventArgs e) => PreviewDialog.ShowText(this, "Using Tunnelr",
+        "Click a card to open or close its tunnel. Cyan means listening. Hover for the destination and connection details.\n\nRight-click a card to copy its endpoint, edit it, or read SSH output. Use File for profiles, imports, and backups. All On and All Off apply to the visible group.");
+
+    private void EditProfile(ServerProfile profile, bool adding)
+    {
+        var dialog = new ServerSettingsDialog(profile) { Owner = this };
+        if (dialog.ShowDialog() != true) return;
+        var prior = (profile.Name, profile.Server, profile.Port, profile.User, profile.Reconnect, profile.HealthCheckInterval);
+        var selected = _config.SelectedProfile;
+        if (!Persist(() =>
+        {
+            (profile.Name, profile.Server, profile.Port, profile.User, profile.Reconnect, profile.HealthCheckInterval) =
+                (dialog.ProfileName, dialog.ServerAddress, dialog.SshPort, dialog.Username, dialog.Reconnect, dialog.HealthCheckInterval);
+            if (adding) _config.Profiles.Add(profile);
+            _config.SelectedProfile = profile.Name;
+        }, () =>
+        {
+            (profile.Name, profile.Server, profile.Port, profile.User, profile.Reconnect, profile.HealthCheckInterval) = prior;
+            if (adding) _config.Profiles.Remove(profile);
+            _config.SelectedProfile = selected;
+        })) return;
+        if ((profile.Server, profile.Port, profile.User) != (prior.Server, prior.Port, prior.User))
+            foreach (var tunnel in profile.Tunnels) tunnel.Session.Stop();
+        if (!profile.Reconnect)
+            foreach (var tunnel in profile.Tunnels.Where(t => t.Session.State is "Retrying" or "Paused")) tunnel.Session.Stop();
+        ServerSettingsDialog.SetStartupEnabled(dialog.Startup);
+        Bind();
+    }
+
+    private void Settings_Click(object sender, RoutedEventArgs e) => EditProfile(Profile, false);
+    private void NewProfile_Click(object sender, RoutedEventArgs e) => EditProfile(new ServerProfile { Name = "" }, true);
+    private void Add_Click(object sender, RoutedEventArgs e) => EditTunnel(null);
+
+    private void EditTunnel(TunnelInfo? old)
+    {
+        var dialog = new EditTunnelDialog(old) { Owner = this };
+        if (dialog.ShowDialog() != true) return;
+        var next = new TunnelInfo { Port = dialog.TunnelPort, RemotePort = dialog.RemotePort,
+            Group = dialog.Group, Nickname = dialog.Nickname };
+        var list = Profile.Tunnels;
+        var index = old == null ? list.Count : list.IndexOf(old);
+        if (!Persist(() => { if (old == null) list.Add(next); else list[index] = next; },
+                     () => { if (old == null) list.Remove(next); else list[index] = old; })) return;
+        var restart = old?.Session.Wanted == true;
+        old?.Session.Stop();
+        Bind();
+        if (restart) next.Session.Start(next, Profile);
+    }
+
+    private void DeleteTunnel(TunnelInfo tunnel)
+    {
+        if (MessageBox.Show(this, $"Delete {tunnel.Nickname} from {Profile.Name}?", "Delete tunnel",
+            MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+        int index = Profile.Tunnels.IndexOf(tunnel);
+        if (!Persist(() => Profile.Tunnels.RemoveAt(index), () => Profile.Tunnels.Insert(index, tunnel))) return;
+        tunnel.Session.Stop();
+        Bind();
+    }
+
+    private void Toggle(TunnelInfo tunnel, ServerProfile profile)
+    {
+        if (profile.Server == "your.server.com") { EditProfile(profile, false); return; }
+        if (tunnel.Session.Wanted) tunnel.Session.Stop();
+        else if (tunnel.Session.State == "Verify host")
+        {
+            if (MessageBox.Show(this, $"Open OpenSSH to verify the fingerprint for {profile.Server}? Compare it with your server's fingerprint before accepting. Then click Connect.", "Verify SSH host",
+                MessageBoxButton.OKCancel) != MessageBoxResult.OK) return;
+            try { TunnelProcess.VerifyHost(profile); tunnel.Session.Stop(); }
+            catch (Exception ex) { MessageBox.Show(this, ex.Message, "OpenSSH"); }
+        }
+        else tunnel.Session.Start(tunnel, profile);
+    }
+
+    private void Toggle_Click(object sender, RoutedEventArgs e) => Toggle((TunnelInfo)((Button)sender).DataContext, Profile);
+    private void Bulk_Click(object sender, RoutedEventArgs e)
+    {
+        if (Profile.Server == "your.server.com") { EditProfile(Profile, false); return; }
+        var tunnels = VisibleTunnels.ToList();
+        var stop = tunnels.All(t => t.Session.Wanted);
+        foreach (var t in tunnels)
+            if (stop) t.Session.Stop();
+            else if (!t.Session.Wanted && t.Session.State != "Verify host") t.Session.Start(t, Profile);
+    }
+
+    private void CardMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        var button = (Button)sender;
+        var tunnel = (TunnelInfo)button.DataContext;
+        var menu = button.ContextMenu;
+        menu.Items.Clear();
+        void Add(string label, Action action)
+        {
+            var item = new MenuItem { Header = label };
+            item.Click += (_, _) => action();
+            menu.Items.Add(item);
+        }
+        Add("Copy endpoint", () => Clipboard.SetText($"127.0.0.1:{tunnel.Port}"));
+        Add("Edit tunnel…", () => EditTunnel(tunnel));
+        Add("SSH output…", () => PreviewDialog.ShowText(this, tunnel.Nickname,
+            tunnel.Session.Output.Length == 0 ? "No SSH output yet." : tunnel.Session.Output));
+        Add("Delete tunnel…", () => DeleteTunnel(tunnel));
+    }
+
+    private void Import_Click(object sender, RoutedEventArgs e)
+    {
+        var picker = new OpenFileDialog { Filter = "Tunnelr settings|*.json;*.previous;*.bak|All files|*.*" };
+        if (picker.ShowDialog(this) == true) Import(picker.FileName);
+    }
+    private void Restore_Click(object sender, RoutedEventArgs e) => Import(TunnelConfig.BackupPath);
+    private void Import(string path)
+    {
+        try
+        {
+            var next = TunnelConfig.Read(path);
+            if (!PreviewDialog.Confirm(this, next, path)) return;
+            TunnelConfig.Save(next);
+            foreach (var tunnel in AllTunnels) tunnel.Session.Stop();
+            _config = next;
+            Bind();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+        { MessageBox.Show(this, ex.Message, "Configuration recovery"); }
+    }
+
+    private void Folder_Click(object sender, RoutedEventArgs e) =>
+        Process.Start(new ProcessStartInfo(Path.GetDirectoryName(TunnelConfig.ConfigPath)!) { UseShellExecute = true });
+
+    private void PowerChanged(object sender, PowerModeChangedEventArgs e) => Dispatcher.InvokeAsync(() =>
+    {
+        if (_exiting) return;
+        foreach (var profile in _config.AllProfiles)
+            foreach (var tunnel in profile.Tunnels)
             {
-                var errorMsg = tunnel.ErrorMessage ?? "Unknown error";
-                MessageBox.Show(
-                    $"Failed to start SSH tunnel on port {tunnel.Port}.\n\n{errorMsg}\n\n" +
-                    "Make sure ssh.exe is available and your key is loaded.",
-                    "Tunnel Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
+                if (e.Mode == PowerModes.Suspend && tunnel.Session.Wanted) tunnel.Session.Stop(profile.Reconnect);
+                if (e.Mode == PowerModes.Resume && tunnel.Session.State == "Paused") tunnel.Session.Start(tunnel, profile);
             }
-            ShowBalloon("Tunnel Connected", $"Port {tunnel.Port} ({tunnel.Nickname})");
+    });
+
+    private void BuildTrayMenu()
+    {
+        while (_trayMenu.Items.Count > 0) _trayMenu.Items[0].Dispose();
+        _trayMenu.Items.Add("Open Tunnelr", null, (_, _) => Reveal());
+        foreach (var profile in _config.AllProfiles)
+        {
+            var submenu = new Forms.ToolStripMenuItem(profile.Name);
+            foreach (var tunnel in profile.Tunnels)
+                submenu.DropDownItems.Add($"{tunnel.Nickname} · {tunnel.Port} · {tunnel.Session.State}",
+                    null, (_, _) => Toggle(tunnel, profile));
+            _trayMenu.Items.Add(submenu);
         }
+        _trayMenu.Items.Add("Exit Tunnelr", null, (_, _) => Exit());
     }
 
-    // ─── Button handlers ───
-
-    private void Add_Click(object sender, RoutedEventArgs e)
-    {
-        var dlg = new AddTunnelDialog { Owner = this };
-        if (dlg.ShowDialog() == true)
-        {
-            if (_config.Tunnels.Any(t => t.Port == dlg.TunnelPort))
-            {
-                MessageBox.Show($"Port {dlg.TunnelPort} is already configured.",
-                    "Duplicate Port", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            _config.Tunnels.Add(new TunnelInfo
-            {
-                Port = dlg.TunnelPort,
-                RemotePort = dlg.RemotePort,
-                Nickname = dlg.Nickname
-            });
-            TunnelConfig.Save(_config);
-            RebuildCards();
-            UpdateStatus();
-        }
-    }
-
-    private void Edit_Click(object sender, RoutedEventArgs e)
-    {
-        if (_config.Tunnels.Count == 0) return;
-
-        // Pick which tunnel to edit
-        var items = _config.Tunnels.Select(t => $"{t.Port} - {t.Nickname}").ToArray();
-        var pickDlg = new DeleteTunnelDialog(items, confirmDelete: false)
-        {
-            Owner = this,
-            Title = "Select Tunnel to Edit"
-        };
-        pickDlg.SetPickerMode("// SELECT TUNNEL TO EDIT", "Select");
-        if (pickDlg.ShowDialog() != true || pickDlg.SelectedIndex < 0) return;
-
-        var tunnel = _config.Tunnels[pickDlg.SelectedIndex];
-        var wasActive = tunnel.IsActive;
-
-        var editDlg = new EditTunnelDialog(tunnel.Port, tunnel.RemotePort, tunnel.Nickname) { Owner = this };
-        if (editDlg.ShowDialog() == true)
-        {
-            // Check for duplicate port (if port changed)
-            if (editDlg.TunnelPort != tunnel.Port &&
-                _config.Tunnels.Any(t => t.Port == editDlg.TunnelPort))
-            {
-                MessageBox.Show($"Port {editDlg.TunnelPort} is already configured.",
-                    "Duplicate Port", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            // If active and port changed, restart the tunnel
-            if (wasActive && (editDlg.TunnelPort != tunnel.Port || editDlg.RemotePort != tunnel.RemotePort))
-            {
-                TunnelProcess.Stop(tunnel);
-                tunnel.Port = editDlg.TunnelPort;
-                tunnel.RemotePort = editDlg.RemotePort;
-                tunnel.Nickname = editDlg.Nickname;
-                TunnelProcess.Start(tunnel, _config);
-            }
-            else
-            {
-                tunnel.Port = editDlg.TunnelPort;
-                tunnel.RemotePort = editDlg.RemotePort;
-                tunnel.Nickname = editDlg.Nickname;
-            }
-
-            TunnelConfig.Save(_config);
-            RebuildCards();
-            UpdateStatus();
-        }
-    }
-
-    private void Delete_Click(object sender, RoutedEventArgs e)
-    {
-        if (_config.Tunnels.Count == 0) return;
-
-        var items = _config.Tunnels.Select(t => $"{t.Port} - {t.Nickname}").ToArray();
-        var dlg = new DeleteTunnelDialog(items) { Owner = this };
-        if (dlg.ShowDialog() == true && dlg.SelectedIndex >= 0 && dlg.SelectedIndex < _config.Tunnels.Count)
-        {
-            var tunnel = _config.Tunnels[dlg.SelectedIndex];
-            TunnelProcess.Stop(tunnel);
-            _config.Tunnels.RemoveAt(dlg.SelectedIndex);
-            TunnelConfig.Save(_config);
-            RebuildCards();
-            UpdateStatus();
-        }
-    }
-
-    private void ToggleAll_Click(object sender, RoutedEventArgs e)
-    {
-        var allActive = _config.Tunnels.All(t => t.IsActive) && _config.Tunnels.Count > 0;
-
-        foreach (var tunnel in _config.Tunnels)
-        {
-            if (allActive)
-            {
-                if (tunnel.IsActive) TunnelProcess.Stop(tunnel);
-            }
-            else
-            {
-                if (!tunnel.IsActive) TunnelProcess.Start(tunnel, _config);
-            }
-        }
-
-        RefreshAllCards();
-        UpdateStatus();
-        ShowBalloon(
-            allActive ? "All Tunnels Disconnected" : "All Tunnels Connected",
-            $"{_config.Tunnels.Count} tunnels");
-    }
-
-    private void Refresh_Click(object sender, RoutedEventArgs e)
-    {
-        RunHealthCheck();
-    }
-
-    // ─── Menu handlers ───
-
-    private void ServerSettings_Click(object sender, RoutedEventArgs e)
-    {
-        var dlg = new ServerSettingsDialog(_config) { Owner = this };
-        if (dlg.ShowDialog() == true)
-        {
-            // Stop all active tunnels before changing server
-            var hadActive = _config.Tunnels.Any(t => t.IsActive);
-            if (hadActive)
-            {
-                TunnelProcess.StopAll(_config.Tunnels);
-            }
-
-            _config.Server = dlg.ServerAddress;
-            _config.Port = dlg.SshPort;
-            _config.User = dlg.Username;
-            _config.HealthCheckInterval = dlg.HealthCheckInterval;
-            TunnelConfig.Save(_config);
-
-            // Reconfigure health timer with new interval
-            SetupHealthTimer();
-
-            RefreshAllCards();
-            UpdateStatus();
-
-            if (hadActive)
-            {
-                MessageBox.Show(
-                    "Server settings changed. All active tunnels have been stopped.\n" +
-                    "Reconnect them with the new settings.",
-                    "Settings Updated", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-        }
-    }
-
-    private void HowToUse_Click(object sender, RoutedEventArgs e)
-    {
-        var dlg = new HowToUseDialog { Owner = this };
-        dlg.ShowDialog();
-    }
-
-    private void Exit_Click(object sender, RoutedEventArgs e) => ExitApplication();
-
-    private void About_Click(object sender, RoutedEventArgs e)
-    {
-        MessageBox.Show(
-            "Tunnelr v1.0\nSSH Tunnel Switchboard\n\n" +
-            $"Server: {_config.User}@{_config.Server}:{_config.Port}\n\n" +
-            "Made with <3 by @jordankzf",
-            "About Tunnelr", MessageBoxButton.OK, MessageBoxImage.Information);
-    }
-
-    // ─── System tray ───
-
-    private void SetupTray()
-    {
-        _trayMenu = new WinForms.ContextMenuStrip();
-        _trayMenu.Opening += TrayMenu_Opening;
-
-        var iconStream = System.Windows.Application.GetResourceStream(
-            new Uri("pack://application:,,,/Resources/app.ico"))?.Stream;
-        var trayIcon = iconStream != null
-            ? new System.Drawing.Icon(iconStream)
-            : System.Drawing.SystemIcons.Application;
-
-        _trayIcon = new WinForms.NotifyIcon
-        {
-            Text = "Tunnelr",
-            Icon = trayIcon,
-            Visible = true,
-            ContextMenuStrip = _trayMenu
-        };
-        _trayIcon.DoubleClick += (s, e) => ShowFromTray();
-    }
-
-    private void TrayMenu_Opening(object? sender, System.ComponentModel.CancelEventArgs e)
-    {
-        _trayMenu.Items.Clear();
-
-        var showItem = new WinForms.ToolStripMenuItem("Show Tunnelr");
-        showItem.Font = new System.Drawing.Font(showItem.Font, System.Drawing.FontStyle.Bold);
-        showItem.Click += (s, ev) => Dispatcher.Invoke(ShowFromTray);
-        _trayMenu.Items.Add(showItem);
-        _trayMenu.Items.Add(new WinForms.ToolStripSeparator());
-
-        foreach (var tunnel in _config.Tunnels)
-        {
-            var t = tunnel;
-            var item = new WinForms.ToolStripMenuItem($"{t.Port} - {t.Nickname}")
-            {
-                Checked = t.IsActive
-            };
-            item.Click += (s, ev) => Dispatcher.Invoke(() =>
-            {
-                ToggleTunnel(t);
-                RefreshAllCards();
-                UpdateStatus();
-            });
-            _trayMenu.Items.Add(item);
-        }
-
-        _trayMenu.Items.Add(new WinForms.ToolStripSeparator());
-        var exitItem = new WinForms.ToolStripMenuItem("Exit");
-        exitItem.Click += (s, ev) => Dispatcher.Invoke(ExitApplication);
-        _trayMenu.Items.Add(exitItem);
-    }
-
-    private void UpdateTrayTooltip()
-    {
-        var active = _config.Tunnels.Count(t => t.IsActive);
-        _trayIcon.Text = $"Tunnelr - {active}/{_config.Tunnels.Count} active";
-    }
-
-    private void ShowBalloon(string title, string text)
-    {
-        _trayIcon.BalloonTipTitle = title;
-        _trayIcon.BalloonTipText = text;
-        _trayIcon.BalloonTipIcon = WinForms.ToolTipIcon.Info;
-        _trayIcon.ShowBalloonTip(2000);
-    }
-
-    private void ShowFromTray()
-    {
-        this.Show();
-        this.WindowState = WindowState.Normal;
-        this.Activate();
-    }
-
-    // ─── Health check timer ───
-
-    private void SetupHealthTimer()
-    {
-        // Stop existing timer if any
-        _healthTimer?.Stop();
-        _healthTimer = null;
-
-        if (_config.HealthCheckInterval <= 0) return;
-
-        _healthTimer = new DispatcherTimer
-        {
-            Interval = TimeSpan.FromSeconds(_config.HealthCheckInterval)
-        };
-        _healthTimer.Tick += (s, e) => RunHealthCheck();
-        _healthTimer.Start();
-    }
-
-    private void RunHealthCheck()
-    {
-        int failed = 0;
-        string? firstFailedName = null;
-
-        foreach (var tunnel in _config.Tunnels)
-        {
-            if (!tunnel.IsActive || tunnel.SshProcess == null) continue;
-
-            bool hasExited;
-            try { hasExited = tunnel.SshProcess.HasExited; }
-            catch { hasExited = true; }
-
-            if (!hasExited) continue;
-
-            int exitCode = -1;
-            try { exitCode = tunnel.SshProcess.ExitCode; } catch { }
-
-            var stderr = TunnelProcess.GetError(tunnel);
-
-            tunnel.IsActive = false;
-            tunnel.HasError = true;
-            tunnel.ErrorMessage = stderr ?? $"SSH process exited with code {exitCode}";
-
-            try { tunnel.SshProcess.Dispose(); } catch { }
-            tunnel.SshProcess = null;
-
-            if (failed == 0) firstFailedName = $"{tunnel.Port} ({tunnel.Nickname})";
-            failed++;
-        }
-
-        if (failed > 0)
-        {
-            RefreshAllCards();
-            UpdateStatus();
-
-            var message = failed == 1
-                ? $"{firstFailedName} disconnected unexpectedly."
-                : $"{failed} tunnels disconnected unexpectedly.";
-            ShowBalloon("Tunnel Failed", message);
-        }
-    }
-
-    // ─── Window lifecycle ───
-
+    public void Reveal() { Show(); WindowState = WindowState.Normal; Activate(); }
+    private void Exit_Click(object sender, RoutedEventArgs e) => Exit();
+    private void Exit() { _exiting = true; Close(); }
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
     {
-        if (!_reallyClosing)
-        {
-            e.Cancel = true;
-            this.Hide();
-            ShowBalloon("Tunnelr", "Still running in the system tray.");
-        }
+        if (!_exiting) { e.Cancel = true; Hide(); }
         else
         {
-            SystemEvents.PowerModeChanged -= OnPowerModeChanged;
-            _healthTimer?.Stop();
-            TunnelProcess.StopAll(_config.Tunnels);
-            _trayIcon.Visible = false;
-            _trayIcon.Dispose();
+            SystemEvents.PowerModeChanged -= PowerChanged;
+            foreach (var tunnel in AllTunnels) tunnel.Session.Stop();
+            _tray.Visible = false;
+            _tray.Dispose();
+            _trayMenu.Dispose();
         }
         base.OnClosing(e);
-    }
-
-    private void ExitApplication()
-    {
-        _reallyClosing = true;
-        Close();
     }
 }

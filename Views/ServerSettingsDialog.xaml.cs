@@ -14,22 +14,21 @@ public partial class ServerSettingsDialog : Window
     public string Username => txtUser.Text.Trim();
     public int HealthCheckInterval { get; private set; }
 
-    public ServerSettingsDialog(AppConfig config, bool isFirstRun = false)
+    public string ProfileName => profileName.Text.Trim();
+    public bool Reconnect => reconnect.IsChecked == true;
+    public bool Startup => chkStartup.IsChecked == true;
+
+    public ServerSettingsDialog(ServerProfile config)
     {
         InitializeComponent();
 
-        txtServer.Text = config.Server;
+        profileName.Text = config.Name;
+        reconnect.IsChecked = config.Reconnect;
+        txtServer.Text = config.Server == "your.server.com" ? "" : config.Server;
         txtPort.Text = config.Port.ToString();
         txtUser.Text = config.User;
         txtHealthInterval.Text = config.HealthCheckInterval.ToString();
         chkStartup.IsChecked = IsStartupEnabled();
-
-        if (isFirstRun)
-        {
-            Title = "Welcome to Tunnelr - Configure Server";
-            btnCancel.IsEnabled = false;
-            btnCancel.Visibility = Visibility.Collapsed;
-        }
 
         txtServer.Focus();
     }
@@ -59,16 +58,13 @@ public partial class ServerSettingsDialog : Window
 
         if (!int.TryParse(txtHealthInterval.Text, out var health) || health < 0)
         {
-            MessageBox.Show("Enter a valid health check interval (0 to disable).", "Invalid Interval",
+            MessageBox.Show("Enter a retry interval in seconds.", "Invalid Interval",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
         SshPort = port;
         HealthCheckInterval = health;
-
-        // Set or remove startup registry entry
-        SetStartupEnabled(chkStartup.IsChecked == true);
 
         DialogResult = true;
     }
@@ -88,7 +84,7 @@ public partial class ServerSettingsDialog : Window
         catch { return false; }
     }
 
-    private static void SetStartupEnabled(bool enabled)
+    public static void SetStartupEnabled(bool enabled)
     {
         try
         {
@@ -97,7 +93,9 @@ public partial class ServerSettingsDialog : Window
 
             if (enabled)
             {
-                var exePath = Environment.ProcessPath;
+                var installedPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "Programs", "Tunnelr", "tunnelr.exe");
+                var exePath = File.Exists(installedPath) ? installedPath : Environment.ProcessPath;
                 if (exePath != null)
                     key.SetValue(AppName, $"\"{exePath}\"");
             }

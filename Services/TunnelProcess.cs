@@ -1,109 +1,136 @@
 using System.Diagnostics;
-using System.Text;
+using System.Threading;
 using Tunnelr.Models;
 
 namespace Tunnelr.Services;
 
-public static class TunnelProcess
+// Called on the window dispatcher. Async continuations publish state on the same dispatcher.
+public sealed class TunnelProcess : System.ComponentModel.INotifyPropertyChanged
 {
-    public static bool Start(TunnelInfo tunnel, AppConfig config)
+    private CancellationTokenSource? _attempt;
+    private Process? _child;
+    private readonly Queue<string> _output = new();
+    public string State { get; private set; } = "Off";
+    public string Detail { get; private set; } = "";
+    public string Output => string.Join(Environment.NewLine, _output);
+    public bool Wanted { get; private set; }
+    public event Action? Changed;
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+    private void Set(string state, string detail = "")
     {
-        if (tunnel.IsActive && tunnel.SshProcess != null && !tunnel.SshProcess.HasExited)
-            return true;
+        State = state;
+        Detail = detail;
+        PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(null));
+        Changed?.Invoke();
+    }
 
-        tunnel.HasError = false;
-        tunnel.ErrorMessage = null;
+    public void Start(TunnelInfo tunnel, ServerProfile profile)
+    {
+        if (_attempt != null) return;
+        Wanted = true;
+        _attempt = new CancellationTokenSource();
+        _ = RunAsync(tunnel, profile, _attempt);
+    }
 
-        var args = string.Join(" ",
-            "-L", $"{tunnel.Port}:localhost:{tunnel.EffectiveRemotePort}",
-            $"{config.User}@{config.Server}",
-            "-p", config.Port.ToString(),
-            "-N",
-            "-o", "StrictHostKeyChecking=no",
-            "-o", "ExitOnForwardFailure=yes",
-            "-o", "ServerAliveInterval=30",
-            "-o", "ServerAliveCountMax=3"
-        );
-
-        var psi = new ProcessStartInfo
-        {
-            FileName = "ssh",
-            Arguments = args,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardError = true
-        };
-
+    private async Task RunAsync(TunnelInfo tunnel, ServerProfile profile, CancellationTokenSource attempt)
+    {
+        var token = attempt.Token;
         try
         {
-            var process = Process.Start(psi);
-            if (process == null)
+            while (!token.IsCancellationRequested)
             {
-                tunnel.HasError = true;
-                tunnel.ErrorMessage = "Failed to start ssh process.";
-                return false;
+                _output.Clear();
+                Set("Connecting");
+                var info = new ProcessStartInfo("ssh.exe")
+                {
+                    RedirectStandardError = true, RedirectStandardInput = true,
+                    UseShellExecute = false, CreateNoWindow = true
+                };
+                foreach (var arg in new[] {
+                    "-v", "-N", "-T", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes",
+                    "-o", "ExitOnForwardFailure=yes", "-o", "ControlMaster=no", "-o", "ControlPath=none",
+                    "-o", "ServerAliveInterval=30", "-o", "ServerAliveCountMax=3", "-o", "ConnectTimeout=15",
+                    "-L", $"127.0.0.1:{tunnel.Port}:localhost:{tunnel.EffectiveRemotePort}",
+                    "-p", profile.Port.ToString(), "-l", profile.User, "--", profile.Server })
+                    info.ArgumentList.Add(arg);
+                using var process = Process.Start(info) ?? throw new IOException("OpenSSH could not start.");
+                _child = process;
+                process.StandardInput.Close();
+                string? line;
+                string failure = "";
+                bool transient = false, unknownHost = false, changedKey = false, occupied = false;
+                while ((line = await process.StandardError.ReadLineAsync()) != null)
+                {
+                    token.ThrowIfCancellationRequested();
+                    if (_output.Count == 160) _output.Dequeue();
+                    _output.Enqueue(line);
+                    if (line == "debug1: Entering interactive session." && !process.HasExited)
+                        Set("Listening");
+                    if (line.StartsWith("debug", StringComparison.Ordinal)) continue;
+                    if (!string.IsNullOrWhiteSpace(line)) failure = line;
+                    occupied |= line.Contains("Address already in use", StringComparison.OrdinalIgnoreCase) ||
+                                line.Contains("Permission denied", StringComparison.OrdinalIgnoreCase) && line.StartsWith("bind ");
+                    changedKey |= line.Contains("REMOTE HOST IDENTIFICATION HAS CHANGED");
+                    unknownHost |= line.Contains("host key is known for", StringComparison.OrdinalIgnoreCase);
+                    transient |= IsNetworkFailure(line);
+                }
+                await process.WaitForExitAsync(token);
+                token.ThrowIfCancellationRequested();
+                _child = null;
+                if (changedKey || unknownHost || occupied || !transient || !profile.Reconnect)
+                {
+                    Wanted = false;
+                    if (changedKey) Set("Blocked", "Host key changed. Verify the change with the server administrator.");
+                    else if (unknownHost) Set("Verify host", "Review the server fingerprint before connecting.");
+                    else if (occupied) Set("Failed", $"Local port {tunnel.Port} is busy or unavailable.");
+                    else Set("Failed", failure.Length > 0 ? failure : $"SSH exited with code {process.ExitCode}.");
+                    return;
+                }
+                Set("Retrying", failure);
+                await Task.Delay(TimeSpan.FromSeconds(Math.Clamp(profile.HealthCheckInterval, 2, 60)), token);
             }
-
-            // Capture stderr asynchronously
-            var stderr = new StringBuilder();
-            process.ErrorDataReceived += (s, e) =>
-            {
-                if (e.Data != null) stderr.AppendLine(e.Data);
-            };
-            process.BeginErrorReadLine();
-
-            // Store stderr ref for later retrieval
-            tunnel.SshProcess = process;
-            tunnel.IsActive = true;
-            _stderrBuffers[tunnel] = stderr;
-            return true;
         }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch (Exception ex)
         {
-            tunnel.HasError = true;
-            tunnel.ErrorMessage = ex.Message;
-            return false;
+            if (!token.IsCancellationRequested) { Wanted = false; Set("Failed", ex.Message); }
         }
-    }
-
-    private static readonly Dictionary<TunnelInfo, StringBuilder> _stderrBuffers = new();
-
-    public static void Stop(TunnelInfo tunnel)
-    {
-        if (tunnel.SshProcess != null)
+        finally
         {
-            try
-            {
-                if (!tunnel.SshProcess.HasExited)
-                    tunnel.SshProcess.Kill(true);
-            }
-            catch { }
-            finally
-            {
-                tunnel.SshProcess.Dispose();
-                tunnel.SshProcess = null;
-            }
+            if (_attempt == attempt) { _attempt = null; _child = null; }
+            attempt.Dispose();
         }
-        _stderrBuffers.Remove(tunnel);
-        tunnel.IsActive = false;
-        tunnel.HasError = false;
-        tunnel.ErrorMessage = null;
     }
 
-    /// <summary>Gets captured stderr for a tunnel whose process has exited.</summary>
-    public static string? GetError(TunnelInfo tunnel)
+    private static bool IsNetworkFailure(string line) =>
+        new[] { "timed out", "reset by peer", "Connection reset", "Connection closed", "closed by remote host",
+                "Broken pipe", "Network is unreachable", "Connection refused", "Could not resolve hostname" }
+        .Any(reason => line.Contains(reason, StringComparison.OrdinalIgnoreCase));
+
+    public void Stop(bool suspend = false)
     {
-        if (_stderrBuffers.TryGetValue(tunnel, out var buf))
+        bool resume = suspend && Wanted;
+        _attempt?.Cancel();
+        _attempt = null;
+        if (_child != null)
         {
-            var msg = buf.ToString().Trim();
-            return string.IsNullOrEmpty(msg) ? null : msg;
+            try { if (!_child.HasExited) _child.Kill(true); }
+            catch (InvalidOperationException) { }
+            _child = null;
         }
-        return null;
+        Wanted = resume;
+        Set(resume ? "Paused" : "Off");
     }
 
-    public static void StopAll(IEnumerable<TunnelInfo> tunnels)
+    // OpenSSH owns the fingerprint prompt and writes the verified key to known_hosts.
+    public static void VerifyHost(ServerProfile profile)
     {
-        foreach (var tunnel in tunnels)
-            Stop(tunnel);
+        var info = new ProcessStartInfo("ssh.exe") { UseShellExecute = true };
+        foreach (var arg in new[] { "-T", "-n", "-o", "StrictHostKeyChecking=ask", "-o", "BatchMode=no",
+            "-o", "PreferredAuthentications=none", "-o", "ClearAllForwardings=yes", "-o", "ControlPath=none",
+            "-o", "ConnectTimeout=15", "-p", profile.Port.ToString(), "-l", profile.User, "--", profile.Server, "exit" })
+            info.ArgumentList.Add(arg);
+        Process.Start(info)?.Dispose();
     }
 }

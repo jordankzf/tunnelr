@@ -8,12 +8,16 @@ public partial class EditTunnelDialog : Window
     public int RemotePort { get; private set; }
     public string Nickname { get; private set; } = string.Empty;
 
-    public EditTunnelDialog(int currentPort, int currentRemotePort, string currentNickname)
+    public string Group => groupName.Text.Trim();
+
+    public EditTunnelDialog(Tunnelr.Models.TunnelInfo? tunnel)
     {
         InitializeComponent();
-        txtPort.Text = currentPort.ToString();
-        txtRemotePort.Text = currentRemotePort > 0 ? currentRemotePort.ToString() : "";
-        txtNickname.Text = currentNickname;
+        Title = heading.Text = tunnel == null ? "Add tunnel" : "Edit tunnel";
+        groupName.Text = tunnel?.Group ?? "";
+        txtPort.Text = tunnel?.Port.ToString() ?? "";
+        txtRemotePort.Text = tunnel?.RemotePort > 0 ? tunnel.RemotePort.ToString() : "";
+        txtNickname.Text = tunnel?.Nickname ?? "";
         txtNickname.Focus();
         txtNickname.SelectAll();
     }

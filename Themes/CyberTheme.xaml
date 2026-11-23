@@ -139,15 +139,61 @@
         <Setter Property="FontSize" Value="12"/>
     </Style>
 
+    <Style x:Key="CyberMenuCommand" TargetType="MenuItem">
+        <Setter Property="Foreground" Value="#e5eff8"/>
+        <Setter Property="Background" Value="{StaticResource BgCardBrush}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="MenuItem">
+                    <Border Background="{TemplateBinding Background}" Padding="8,5,14,5">
+                        <DockPanel>
+                            <TextBlock Width="16" x:Name="check" Text="✓" Visibility="Hidden"/>
+                            <ContentPresenter ContentSource="Header" RecognizesAccessKey="True"/>
+                        </DockPanel>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True"><Setter TargetName="check" Property="Visibility" Value="Visible"/></Trigger>
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter Property="Background" Value="#16394c"/>
+                            <Setter Property="Foreground" Value="{StaticResource NeonCyanBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="#91a1af"/></Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style x:Key="CyberMenuItem" TargetType="MenuItem">
         <Setter Property="Foreground" Value="{StaticResource TextLightBrush}"/>
         <Setter Property="FontFamily" Value="Consolas"/>
         <Setter Property="FontSize" Value="12"/>
-        <Style.Triggers>
-            <Trigger Property="IsHighlighted" Value="True">
-                <Setter Property="Foreground" Value="{StaticResource NeonCyanBrush}"/>
-            </Trigger>
-        </Style.Triggers>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="MenuItem">
+                    <Grid>
+                        <Border Background="{TemplateBinding Background}" Padding="7,3">
+                            <ContentPresenter ContentSource="Header" RecognizesAccessKey="True"/>
+                        </Border>
+                        <Popup x:Name="PART_Popup" Placement="Bottom" Focusable="False"
+                               IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}">
+                            <Border Background="{StaticResource BgCardBrush}" BorderBrush="{StaticResource NeonCyanDimBrush}" BorderThickness="1" Padding="2">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" CanContentScroll="True">
+                                    <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                                </ScrollViewer>
+                            </Border>
+                        </Popup>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter Property="Background" Value="#16394c"/>
+                            <Setter Property="Foreground" Value="{StaticResource NeonCyanBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <!-- ══════════════════════════════════════════════════════════ -->
