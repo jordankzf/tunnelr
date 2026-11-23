@@ -2,6 +2,8 @@
 
 A Windows tray app for SSH local port forwarding. Click a neon card to toggle its tunnel. Hover for the endpoint, destination and state. Right-click to copy the endpoint or inspect SSH output.
 
+<img src="screenshot.png" alt="Tunnelr switchboard showing four tunnel cards with PostgreSQL connected" width="400">
+
 ## Install or build
 
 Download **tunnelr.exe** for Windows x64, or choose **tunnelr_minimal.exe** if the x64 .NET 7 Desktop Runtime is already installed. [GitHub releases](https://github.com/jordankzf/tunnelr/releases/latest)
